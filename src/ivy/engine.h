@@ -8,6 +8,15 @@
 namespace ivy {
 
 /**
+ * \brief Engine options
+ */
+struct Options {
+    int renderWidth = 1280;
+    int renderHeight = 720;
+    const char *windowTitle = "ivy";
+};
+
+/**
  * \brief The core engine, everything runs from here
  */
 class Engine final {
@@ -18,9 +27,15 @@ public:
     /**
      * \brief Runs the engine
      */
-    [[noreturn]] void run();
+    void run();
+
+    Options &getOptions() {
+        return options_;
+    }
 
 private:
+    Options options_;
+
     Platform platform_;
     Renderer renderer_;
 };

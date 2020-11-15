@@ -4,7 +4,7 @@
 namespace ivy {
 
 Engine::Engine()
-    : renderer_(platform_) {
+    : platform_(*this), renderer_(platform_) {
     LOG_CHECKPOINT();
 }
 
@@ -15,10 +15,10 @@ Engine::~Engine() {
 void Engine::run() {
     LOG_CHECKPOINT();
 
-    for (;;) {
-        platform_.update();
-
+    while (!platform_.isCloseRequested()) {
         renderer_.render();
+
+        platform_.update();
     }
 }
 
