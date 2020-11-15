@@ -18,6 +18,10 @@ public:
     ~RenderContext();
 
 private:
+    /**
+     * \brief Get a vector of required instance extensions, will error if at least one extension is unsupported
+     * \return Vector of supported instance extensions
+     */
     std::vector<const char *> getInstanceExtensions();
 
     VkInstance instance_ = VK_NULL_HANDLE;

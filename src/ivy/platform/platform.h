@@ -25,13 +25,13 @@ public:
      * \brief Check whether platform has requested for the application to close
      * \return Whether or not close was requested
      */
-    bool isCloseRequested() const;
+    [[nodiscard]] bool isCloseRequested() const;
 
     /**
      * \brief Get the pointer to the GLFWwindow
      * \return GLFWwindow
      */
-    GLFWwindow *getGlfwWindow() const;
+    [[nodiscard]] GLFWwindow *getGlfwWindow() const;
 
 private:
     GLFWwindow *window_;

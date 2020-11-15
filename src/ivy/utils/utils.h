@@ -13,6 +13,9 @@ std::string get_date_time_as_string();
 
 }
 
+/**
+ * \brief Get the number of elements in an array
+ */
 #define COUNTOF(x) (sizeof((x)) / sizeof((x)[0]))
 
 #endif // IVY_UTILS_H

@@ -6,6 +6,9 @@
 
 namespace ivy {
 
+/**
+ * \brief Stringify a VkResult
+ */
 const char *vk_result_to_string(VkResult result);
 
 }
