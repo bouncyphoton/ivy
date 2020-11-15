@@ -3,13 +3,14 @@
 
 namespace ivy {
 
-Renderer::Renderer(const Platform &platform) {
+Renderer::Renderer() {
     LOG_CHECKPOINT();
-    // TODO
+    // TODO: choose device, create pipelines etc. via a "render context"?
 }
 
 Renderer::~Renderer() {
     LOG_CHECKPOINT();
+    // TODO
 }
 
 void Renderer::render() {

@@ -13,7 +13,7 @@ class Engine;
  */
 class Platform final {
 public:
-    Platform(Engine &engine);
+    explicit Platform(Engine &engine);
     ~Platform();
 
     /**

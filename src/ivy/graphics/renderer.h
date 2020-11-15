@@ -1,8 +1,6 @@
 #ifndef IVY_RENDERER_H
 #define IVY_RENDERER_H
 
-#include "ivy/platform/platform.h"
-
 namespace ivy {
 
 /**
@@ -10,7 +8,7 @@ namespace ivy {
  */
 class Renderer final {
 public:
-    explicit Renderer(const Platform &platform);
+    Renderer();
     ~Renderer();
 
     void render();

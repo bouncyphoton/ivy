@@ -15,7 +15,7 @@ namespace ivy {
 /**
  * \brief Message logging
  */
-class Log {
+class Log final {
 public:
     /**
      * \brief Log an informational message

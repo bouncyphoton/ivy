@@ -4,7 +4,7 @@
 namespace ivy {
 
 Engine::Engine()
-    : platform_(*this), renderer_(platform_) {
+    : platform_(*this) {
     LOG_CHECKPOINT();
 }
 
