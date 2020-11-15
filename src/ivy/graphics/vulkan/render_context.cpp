@@ -59,7 +59,7 @@ RenderContext::RenderContext(const Platform &platform) {
     }
 
     std::vector<const char *> extensions = getInstanceExtensions();
-    instanceCreateInfo.enabledExtensionCount = extensions.size();
+    instanceCreateInfo.enabledExtensionCount = (u32)extensions.size();
     instanceCreateInfo.ppEnabledExtensionNames = extensions.data();
 
     VK_CHECKF(vkCreateInstance(&instanceCreateInfo, nullptr, &instance_));

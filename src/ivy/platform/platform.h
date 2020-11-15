@@ -6,7 +6,7 @@ typedef struct GLFWwindow GLFWwindow;
 
 namespace ivy {
 
-class Options;
+struct Options;
 
 /**
  * \brief Platform abstraction layer

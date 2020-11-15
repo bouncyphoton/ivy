@@ -5,7 +5,7 @@
 
 namespace ivy {
 
-class Options;
+struct Options;
 class Platform;
 
 /**

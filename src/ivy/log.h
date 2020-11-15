@@ -5,6 +5,10 @@
 #include <cstdio>
 #include <cstdlib>
 
+#ifndef __PRETTY_FUNCTION__
+#define __PRETTY_FUNCTION__ __func__
+#endif
+
 /**
  * \brief Debug log what function we're in
  */
