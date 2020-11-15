@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#ifndef __PRETTY_FUNCTION__
+#ifdef _MSC_VER
 #define __PRETTY_FUNCTION__ __func__
 #endif
 
