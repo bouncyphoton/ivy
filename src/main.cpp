@@ -2,7 +2,7 @@
 
 int main() {
     // Static so that destructor is called on fatal error exit()
-    static ivy::Engine engine;
+    ivy::Engine engine;
     engine.run();
 
     return 0;

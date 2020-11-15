@@ -7,17 +7,16 @@
 
 namespace ivy {
 
-Platform::Platform(Engine &engine) {
+Platform::Platform(const Options &options) {
     LOG_CHECKPOINT();
 
     if (!glfwInit()) {
         Log::fatal("Failed to init glfw");
     }
 
-    const Options &opts = engine.getOptions();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    window_ = glfwCreateWindow(opts.renderWidth, opts.renderHeight, opts.windowTitle, nullptr, nullptr);
+    window_ = glfwCreateWindow(options.renderWidth, options.renderHeight, options.appName, nullptr, nullptr);
 
     if (!window_) {
         Log::fatal("Failed to create window");
@@ -39,6 +38,10 @@ void Platform::update() {
 
 bool Platform::isCloseRequested() const {
     return glfwWindowShouldClose(window_);
+}
+
+GLFWwindow *Platform::getGlfwWindow() const {
+    return window_;
 }
 
 }

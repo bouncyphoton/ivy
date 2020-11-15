@@ -6,14 +6,14 @@ typedef struct GLFWwindow GLFWwindow;
 
 namespace ivy {
 
-class Engine;
+class Options;
 
 /**
  * \brief Platform abstraction layer
  */
 class Platform final {
 public:
-    explicit Platform(Engine &engine);
+    explicit Platform(const Options &options);
     ~Platform();
 
     /**
@@ -26,6 +26,12 @@ public:
      * \return Whether or not close was requested
      */
     bool isCloseRequested() const;
+
+    /**
+     * \brief Get the pointer to the GLFWwindow
+     * \return GLFWwindow
+     */
+    GLFWwindow *getGlfwWindow() const;
 
 private:
     GLFWwindow *window_;

@@ -2,8 +2,6 @@
 #define IVY_ENGINE_H
 
 #include "ivy/types.h"
-#include "ivy/platform/platform.h"
-#include "ivy/graphics/renderer.h"
 
 namespace ivy {
 
@@ -11,9 +9,9 @@ namespace ivy {
  * \brief Engine options
  */
 struct Options {
-    int renderWidth = 1280;
-    int renderHeight = 720;
-    const char *windowTitle = "ivy";
+    i32 renderWidth = 1280;
+    i32 renderHeight = 720;
+    const char *appName = "ivy";
 };
 
 /**
@@ -29,15 +27,16 @@ public:
      */
     void run();
 
+    /**
+     * \brief Get reference to engine options
+     * \return Engine options
+     */
     Options &getOptions() {
         return options_;
     }
 
 private:
     Options options_;
-
-    Platform platform_;
-    Renderer renderer_;
 };
 
 }
