@@ -13,7 +13,7 @@ namespace ivy {
 class Engine final {
 public:
     Engine();
-    ~Engine() = default;
+    ~Engine();
 
     /**
      * \brief Runs the engine

@@ -22,4 +22,4 @@ using f64 = double;
 
 }
 
-#endif //IVY_TYPES_H
+#endif // IVY_TYPES_H

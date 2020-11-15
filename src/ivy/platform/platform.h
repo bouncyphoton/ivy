@@ -19,4 +19,4 @@ public:
 
 }
 
-#endif //IVY_PLATFORM_H
+#endif // IVY_PLATFORM_H

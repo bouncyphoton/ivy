@@ -1,6 +1,7 @@
 #include "ivy/engine.h"
 
 int main() {
-    ivy::Engine engine;
+    // Static so that destructor is called on exit()
+    static ivy::Engine engine;
     engine.run();
 }

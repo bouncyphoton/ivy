@@ -11,10 +11,11 @@ namespace ivy {
 class Renderer final {
 public:
     explicit Renderer(const Platform &platform);
+    ~Renderer();
 
     void render();
 };
 
 }
 
-#endif //IVY_RENDERER_H
+#endif // IVY_RENDERER_H
