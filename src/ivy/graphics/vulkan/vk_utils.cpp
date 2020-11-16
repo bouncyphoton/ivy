@@ -1,4 +1,6 @@
 #include "vk_utils.h"
+#include "ivy/types.h"
+#include <GLFW/glfw3.h>
 
 namespace ivy {
 
@@ -49,6 +51,68 @@ const char *vk_result_to_string(VkResult result) {
             return "Unknown";
     }
 #undef VULKAN_CASE
+}
+
+std::vector<const char *> getInstanceExtensions() {
+    // Get required extensions from glfw
+    u32 numGlfwExtensions;
+    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&numGlfwExtensions);
+    std::vector<const char *> exts(glfwExtensions, glfwExtensions + numGlfwExtensions);
+
+    // Check if extensions are supported
+    u32 numSupportedExtensions;
+    VK_CHECKF(vkEnumerateInstanceExtensionProperties(nullptr, &numSupportedExtensions, nullptr));
+    std::vector<VkExtensionProperties> supportedExtensions(numSupportedExtensions);
+    vkEnumerateInstanceExtensionProperties(nullptr, &numSupportedExtensions, supportedExtensions.data());
+
+    // Check each requested extension
+    std::string unsupportedList;
+    for (const char *ext : exts) {
+        bool found = false;
+
+        // Search for extension in supported vector
+        for (VkExtensionProperties props : supportedExtensions) {
+            if (std::string(props.extensionName) == ext) {
+                found = true;
+                break;
+            }
+        }
+
+        // If not found, keep track of it for logging later
+        if (!found) {
+            if (!unsupportedList.empty()) {
+                unsupportedList += ", ";
+            }
+            unsupportedList += ext;
+        }
+    }
+
+    // Fatal error if we requested an extension that isn't supported
+    if (!unsupportedList.empty()) {
+        Log::fatal("The following instance extensions are not supported: %s", unsupportedList.c_str());
+    }
+
+    return exts;
+}
+
+std::vector<const char *> getDeviceExtensions() {
+    return { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+}
+
+VkSurfaceCapabilitiesKHR getSurfaceCapabilities(VkPhysicalDevice physical_device, VkSurfaceKHR surface) {
+    VkSurfaceCapabilitiesKHR capabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &capabilities);
+
+    return capabilities;
+}
+
+std::vector<VkPresentModeKHR> getPresentModes(VkPhysicalDevice physical_device, VkSurfaceKHR surface) {
+    u32 numPresentModes;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &numPresentModes, nullptr);
+    std::vector<VkPresentModeKHR> presentModes(numPresentModes);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &numPresentModes, presentModes.data());
+
+    return presentModes;
 }
 
 }

@@ -1,6 +1,7 @@
 #ifndef IVY_RENDER_CONTEXT_H
 #define IVY_RENDER_CONTEXT_H
 
+#include <ivy/types.h>
 #include <vulkan/vulkan.h>
 #include <vector>
 
@@ -19,13 +20,22 @@ public:
 
 private:
     /**
-     * \brief Get a vector of required instance extensions, will error if at least one extension is unsupported
-     * \return Vector of supported instance extensions
+     * \brief Choose a physical device
      */
-    std::vector<const char *> getInstanceExtensions();
+    void choosePhysicalDevice();
 
     VkInstance instance_ = VK_NULL_HANDLE;
     VkSurfaceKHR surface_ = VK_NULL_HANDLE;
+
+    VkPhysicalDevice physicalDevice_ = VK_NULL_HANDLE;
+    u32 graphicsFamilyIndex_ = 0;
+    u32 computeFamilyIndex_ = 0;
+    u32 presentFamilyIndex_ = 0;
+
+    VkDevice device_ = VK_NULL_HANDLE;
+    VkQueue graphicsQueue_;
+    VkQueue computeQueue_;
+    VkQueue presentQueue_;
 };
 
 }

@@ -6,7 +6,7 @@
 #include <cstdlib>
 
 #ifdef _MSC_VER
-#define __PRETTY_FUNCTION__ __func__
+    #define __PRETTY_FUNCTION__ __func__
 #endif
 
 /**

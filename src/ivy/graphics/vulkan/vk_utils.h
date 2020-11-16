@@ -3,6 +3,7 @@
 
 #include "ivy/log.h"
 #include <vulkan/vulkan.h>
+#include <vector>
 
 namespace ivy {
 
@@ -10,6 +11,34 @@ namespace ivy {
  * \brief Stringify a VkResult
  */
 const char *vk_result_to_string(VkResult result);
+
+/**
+ * \brief Get a vector of required instance extensions, will error if at least one extension is unsupported
+ * \return Vector of supported instance extensions
+ */
+std::vector<const char *> getInstanceExtensions();
+
+/**
+ * \brief Get a vector of required device extensions
+ * \return Vector of device extensions
+ */
+std::vector<const char *> getDeviceExtensions();
+
+/**
+ * \brief Get the surface capabilities for a given physical device and surface
+ * \param physical_device
+ * \param surface
+ * \return Surface capabilities
+ */
+VkSurfaceCapabilitiesKHR getSurfaceCapabilities(VkPhysicalDevice physical_device, VkSurfaceKHR surface);
+
+/**
+ * \brief Get present modes for a given physical device and surface
+ * \param physical_device
+ * \param surface
+ * \return Vector of present modes
+ */
+std::vector<VkPresentModeKHR> getPresentModes(VkPhysicalDevice physical_device, VkSurfaceKHR surface);
 
 }
 

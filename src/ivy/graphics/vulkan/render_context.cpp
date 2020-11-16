@@ -4,8 +4,8 @@
 #include "ivy/consts.h"
 #include "ivy/utils/utils.h"
 #include "ivy/platform/platform.h"
-
 #include <GLFW/glfw3.h>
+#include <set>
 
 namespace ivy {
 
@@ -69,56 +69,174 @@ RenderContext::RenderContext(const Platform &platform) {
     //----------------------------------
 
     VK_CHECKF(glfwCreateWindowSurface(instance_, platform.getGlfwWindow(), nullptr, &surface_));
+
+    //----------------------------------
+    // Physical device selection
+    //----------------------------------
+
+    choosePhysicalDevice();
+
+    //----------------------------------
+    // Logical device creation
+    //----------------------------------
+
+    std::set<u32> uniqueIndices = { graphicsFamilyIndex_, computeFamilyIndex_, presentFamilyIndex_ };
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    float queuePriority = 1;
+
+    for (auto &index : uniqueIndices) {
+        VkDeviceQueueCreateInfo queueCreateInfo = {};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = index;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+
+        queueCreateInfos.emplace_back(queueCreateInfo);
+    }
+
+    VkDeviceCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    createInfo.queueCreateInfoCount = queueCreateInfos.size();
+
+    std::vector<const char *> deviceExtensions = getDeviceExtensions();
+    createInfo.enabledExtensionCount = deviceExtensions.size();
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+    VK_CHECKF(vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_));
+
+    //----------------------------------
+    // Get our queues
+    //----------------------------------
+
+    vkGetDeviceQueue(device_, graphicsFamilyIndex_, 0, &graphicsQueue_);
+    vkGetDeviceQueue(device_, computeFamilyIndex_, 0, &computeQueue_);
+    vkGetDeviceQueue(device_, presentFamilyIndex_, 0, &presentQueue_);
 }
 
 RenderContext::~RenderContext() {
     LOG_CHECKPOINT();
+
+    vkDestroyDevice(device_, nullptr);
 
     vkDestroySurfaceKHR(instance_, surface_, nullptr);
 
     vkDestroyInstance(instance_, nullptr);
 }
 
-std::vector<const char *> RenderContext::getInstanceExtensions() {
-    // Get required extensions from glfw
-    u32 numGlfwExtensions;
-    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&numGlfwExtensions);
-    std::vector<const char *> exts(glfwExtensions, glfwExtensions + numGlfwExtensions);
+void RenderContext::choosePhysicalDevice() {
+    u32 numPhysicalDevices;
+    VK_CHECKF(vkEnumeratePhysicalDevices(instance_, &numPhysicalDevices, nullptr));
+    std::vector<VkPhysicalDevice> physicalDevices(numPhysicalDevices);
+    VK_CHECKW(vkEnumeratePhysicalDevices(instance_, &numPhysicalDevices, physicalDevices.data()));
 
-    // Check if extensions are supported
-    u32 numSupportedExtensions;
-    VK_CHECKF(vkEnumerateInstanceExtensionProperties(nullptr, &numSupportedExtensions, nullptr));
-    std::vector<VkExtensionProperties> supportedExtensions(numSupportedExtensions);
-    vkEnumerateInstanceExtensionProperties(nullptr, &numSupportedExtensions, supportedExtensions.data());
+    if (numPhysicalDevices == 0) {
+        Log::fatal("No physical devices were found");
+    }
 
-    // Check each requested extension
-    std::string unsupportedList;
-    for (const char *ext : exts) {
-        bool found = false;
+    std::vector<const char *> requiredExtensions = getDeviceExtensions();
 
-        // Search for extension in supported vector
-        for (VkExtensionProperties props : supportedExtensions) {
-            if (std::string(props.extensionName) == ext) {
-                found = true;
-                break;
+    Log::info("+-- Physical Devices -----------");
+    for (VkPhysicalDevice &physicalDevice : physicalDevices) {
+        // Get properties
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+        // Get device extensions
+        u32 numDeviceExtensions;
+        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &numDeviceExtensions, nullptr);
+        std::vector<VkExtensionProperties> deviceExtensions(numDeviceExtensions);
+        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &numDeviceExtensions, deviceExtensions.data());
+
+        // We want a device that supports our api version
+        bool suitable = true;
+        suitable = suitable && properties.apiVersion >= VULKAN_API_VERSION;
+
+        // Check if the device has the extensions we require
+        for (const char *requiredExt : requiredExtensions) {
+            bool extensionFound = false;
+
+            // See if we can find the current required extension in the device extensions list
+            for (VkExtensionProperties &ext : deviceExtensions) {
+                if (std::string(ext.extensionName) == requiredExt) {
+                    extensionFound = true;
+                    break;
+                }
+            }
+
+            suitable = suitable && extensionFound;
+        }
+
+        // If extensions found, check if swapchain is ok for our uses
+        if (suitable) {
+            suitable = suitable && !getPresentModes(physicalDevice, surface_).empty();
+
+            // Color attachment flag always supported, we need to check for transfer
+            u32 usageFlags = getSurfaceCapabilities(physicalDevice, surface_).supportedUsageFlags;
+            suitable = suitable && (usageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+        }
+
+        // Get device queue families
+        u32 numQueueFamilies;
+        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &numQueueFamilies, nullptr);
+        std::vector<VkQueueFamilyProperties> queueFamilies(numQueueFamilies);
+        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &numQueueFamilies, queueFamilies.data());
+
+        // Check if the device has queue families that support operations we need
+        std::pair<bool, u32> graphicsFamilyIndex;
+        std::pair<bool, u32> computeFamilyIndex;
+        std::pair<bool, u32> presentFamilyIndex;
+        for (u32 i = 0; i < numQueueFamilies; ++i) {
+            // Check graphics support
+            if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                graphicsFamilyIndex = { true, i };
+            }
+
+            // Check compute support
+            if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+                computeFamilyIndex = { true, i };
+            }
+
+            // Check present support
+            VkBool32 presentSupport;
+            vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface_, &presentSupport);
+            if (presentSupport) {
+                presentFamilyIndex = { true, i };
             }
         }
 
-        // If not found, keep track of it for logging later
-        if (!found) {
-            if (!unsupportedList.empty()) {
-                unsupportedList += ", ";
+        suitable = suitable && graphicsFamilyIndex.first && computeFamilyIndex.first && presentFamilyIndex.first;
+
+        // If it's suitable
+        if (suitable) {
+            // If physical device is not set yet OR current device is a discrete GPU, set it!
+            if (physicalDevice_ == VK_NULL_HANDLE || properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+                physicalDevice_ = physicalDevice;
+                graphicsFamilyIndex_ = graphicsFamilyIndex.second;
+                computeFamilyIndex_ = computeFamilyIndex.second;
+                presentFamilyIndex_ = presentFamilyIndex.second;
             }
-            unsupportedList += ext;
         }
+
+        // Log information about the device
+        Log::info("| %s", properties.deviceName);
+        Log::info("|   Version:  %d.%d.%d", VK_VERSION_TO_COMMA_SEPARATED_VALUES(properties.apiVersion));
+        Log::info("|   Num Exts: %d", numDeviceExtensions);
+        Log::info("|   Discrete: %s", properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? "yes" : "no");
+        Log::info("|   Graphics: %s", graphicsFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Compute:  %s", computeFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Present:  %s", presentFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Suitable: %s", suitable ? "yes" : "no");
+        Log::info("+-------------------------------");
     }
 
-    // Fatal error if we requested an extension that isn't supported
-    if (!unsupportedList.empty()) {
-        Log::fatal("The following instance extensions are not supported: %s", unsupportedList.c_str());
+    if (physicalDevice_ == VK_NULL_HANDLE) {
+        Log::fatal("Failed to find a suitable physical device");
     }
 
-    return exts;
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(physicalDevice_, &properties);
+    Log::info("Using physical device: %s", properties.deviceName);
 }
 
 }
