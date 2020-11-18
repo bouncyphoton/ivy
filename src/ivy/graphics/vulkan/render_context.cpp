@@ -126,6 +126,9 @@ RenderContext::RenderContext(const Options &options, const Platform &platform)
 RenderContext::~RenderContext() {
     LOG_CHECKPOINT();
 
+    for (VkImageView view : swapchainImageViews_) {
+        vkDestroyImageView(device_, view, nullptr);
+    }
     vkDestroySwapchainKHR(device_, swapchain_, nullptr);
     vkDestroyDevice(device_, nullptr);
     vkDestroySurfaceKHR(instance_, surface_, nullptr);
