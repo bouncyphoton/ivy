@@ -18,7 +18,7 @@ void Engine::run() {
 
     // These are static so that fatal error still calls destructors
     static Platform platform(options_);
-    static Renderer renderer(platform);
+    static Renderer renderer(options_, platform);
 
     // Main loop
     while (!platform.isCloseRequested()) {

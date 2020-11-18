@@ -9,8 +9,8 @@ namespace ivy {
  * \brief Engine options
  */
 struct Options {
-    i32 renderWidth = 1280;
-    i32 renderHeight = 720;
+    u32 renderWidth = 1280;
+    u32 renderHeight = 720;
     const char *appName = "ivy";
 };
 

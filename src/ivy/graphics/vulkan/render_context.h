@@ -9,13 +9,14 @@ namespace ivy {
 
 class Engine;
 class Platform;
+struct Options;
 
 /**
  * \brief Vulkan abstraction layer
  */
 class RenderContext final {
 public:
-    explicit RenderContext(const Platform &platform);
+    explicit RenderContext(const Options &options, const Platform &platform);
     ~RenderContext();
 
 private:
@@ -23,6 +24,13 @@ private:
      * \brief Choose a physical device
      */
     void choosePhysicalDevice();
+
+    /**
+     * \brief Create the swapchain and images for swapchain
+     */
+    void createSwapchain();
+
+    const Options &options_;
 
     VkInstance instance_ = VK_NULL_HANDLE;
     VkSurfaceKHR surface_ = VK_NULL_HANDLE;
@@ -36,6 +44,12 @@ private:
     VkQueue graphicsQueue_;
     VkQueue computeQueue_;
     VkQueue presentQueue_;
+
+    VkSwapchainKHR swapchain_;
+    VkExtent2D swapchainExtent_;
+    VkFormat swapchainFormat_;
+    std::vector<VkImage> swapchainImages_;
+    std::vector<VkImageView> swapchainImageViews_;
 };
 
 }

@@ -1,6 +1,7 @@
 #include "vk_utils.h"
 #include "ivy/types.h"
 #include <GLFW/glfw3.h>
+#include <algorithm>
 
 namespace ivy {
 
@@ -51,6 +52,13 @@ const char *vk_result_to_string(VkResult result) {
             return "Unknown";
     }
 #undef VULKAN_CASE
+}
+
+VkExtent2D clamp(VkExtent2D x, VkExtent2D min_ext, VkExtent2D max_ext) {
+    return {
+        std::min(max_ext.width, std::max(min_ext.width, x.width)),
+        std::min(max_ext.height, std::max(min_ext.height, x.height))
+    };
 }
 
 std::vector<const char *> getInstanceExtensions() {
@@ -104,6 +112,15 @@ VkSurfaceCapabilitiesKHR getSurfaceCapabilities(VkPhysicalDevice physical_device
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &capabilities);
 
     return capabilities;
+}
+
+std::vector<VkSurfaceFormatKHR> getSurfaceFormats(VkPhysicalDevice physical_device, VkSurfaceKHR surface) {
+    u32 numFormats;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &numFormats, nullptr);
+    std::vector<VkSurfaceFormatKHR> formats(numFormats);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &numFormats, formats.data());
+
+    return formats;
 }
 
 std::vector<VkPresentModeKHR> getPresentModes(VkPhysicalDevice physical_device, VkSurfaceKHR surface) {

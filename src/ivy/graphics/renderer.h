@@ -13,7 +13,7 @@ class Platform;
  */
 class Renderer final {
 public:
-    explicit Renderer(const Platform &platform);
+    explicit Renderer(const Options &options, const Platform &platform);
     ~Renderer();
 
     /**

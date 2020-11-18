@@ -13,6 +13,11 @@ namespace ivy {
 const char *vk_result_to_string(VkResult result);
 
 /**
+ * \brief Clamp a VkExtent2D
+ */
+VkExtent2D clamp(VkExtent2D x, VkExtent2D min_ext, VkExtent2D max_ext);
+
+/**
  * \brief Get a vector of required instance extensions, will error if at least one extension is unsupported
  * \return Vector of supported instance extensions
  */
@@ -31,6 +36,14 @@ std::vector<const char *> getDeviceExtensions();
  * \return Surface capabilities
  */
 VkSurfaceCapabilitiesKHR getSurfaceCapabilities(VkPhysicalDevice physical_device, VkSurfaceKHR surface);
+
+/**
+ * \brief Get vector of supported swapchain format-color space pairs for a surface
+ * \param physical_device
+ * \param surface
+ * \return Vector of color formats supported by surface
+ */
+std::vector<VkSurfaceFormatKHR> getSurfaceFormats(VkPhysicalDevice physical_device, VkSurfaceKHR surface);
 
 /**
  * \brief Get present modes for a given physical device and surface
