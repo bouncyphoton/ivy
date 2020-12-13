@@ -2,10 +2,17 @@
 #define IVY_ENGINE_H
 
 #include "ivy/types.h"
-#include "ivy/platform/platform.h"
-#include "ivy/graphics/renderer.h"
 
 namespace ivy {
+
+/**
+ * \brief Engine options
+ */
+struct Options {
+    u32 renderWidth = 1280;
+    u32 renderHeight = 720;
+    const char *appName = "ivy";
+};
 
 /**
  * \brief The core engine, everything runs from here
@@ -13,16 +20,23 @@ namespace ivy {
 class Engine final {
 public:
     Engine();
-    ~Engine() = default;
+    ~Engine();
 
     /**
      * \brief Runs the engine
      */
-    [[noreturn]] void run();
+    void run();
+
+    /**
+     * \brief Get reference to engine options
+     * \return Engine options
+     */
+    Options &getOptions() {
+        return options_;
+    }
 
 private:
-    Platform platform_;
-    Renderer renderer_;
+    Options options_;
 };
 
 }

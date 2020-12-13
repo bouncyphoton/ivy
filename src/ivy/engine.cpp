@@ -1,16 +1,30 @@
 #include "engine.h"
+#include "ivy/log.h"
+#include "ivy/platform/platform.h"
+#include "ivy/renderer.h"
 
 namespace ivy {
 
-Engine::Engine()
-    : renderer_(platform_) {
+Engine::Engine() {
+    LOG_CHECKPOINT();
+}
+
+Engine::~Engine() {
+    LOG_CHECKPOINT();
 }
 
 void Engine::run() {
-    for (;;) {
-        platform_.update();
+    LOG_CHECKPOINT();
 
-        renderer_.render();
+    // These are static so that fatal error still calls destructors
+    static Platform platform(options_);
+    static Renderer renderer(options_, platform);
+
+    // Main loop
+    while (!platform.isCloseRequested()) {
+        platform.update();
+
+        renderer.render();
     }
 }
 
