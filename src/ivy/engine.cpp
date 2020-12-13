@@ -1,7 +1,7 @@
 #include "engine.h"
 #include "ivy/log.h"
 #include "ivy/platform/platform.h"
-#include "ivy/graphics/renderer.h"
+#include "ivy/renderer.h"
 
 namespace ivy {
 

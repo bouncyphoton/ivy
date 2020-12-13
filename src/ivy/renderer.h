@@ -1,7 +1,7 @@
 #ifndef IVY_RENDERER_H
 #define IVY_RENDERER_H
 
-#include "ivy/graphics/vulkan/render_context.h"
+#include "ivy/graphics/render_context.h"
 
 namespace ivy {
 
@@ -22,7 +22,7 @@ public:
     void render();
 
 private:
-    RenderContext ctx_;
+    gfx::RenderContext ctx_;
 };
 
 }

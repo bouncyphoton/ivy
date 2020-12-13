@@ -5,7 +5,7 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
-namespace ivy {
+namespace ivy::gfx {
 
 /**
  * \brief Stringify a VkResult

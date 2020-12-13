@@ -6,10 +6,12 @@
 #include <vector>
 
 namespace ivy {
+    class Engine;
+    class Platform;
+    struct Options;
+}
 
-class Engine;
-class Platform;
-struct Options;
+namespace ivy::gfx {
 
 /**
  * \brief Vulkan abstraction layer

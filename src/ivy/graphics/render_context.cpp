@@ -3,13 +3,12 @@
 #include "ivy/types.h"
 #include "ivy/consts.h"
 #include "ivy/engine.h"
-#include "ivy/utils/utils.h"
 #include "ivy/platform/platform.h"
 #include <GLFW/glfw3.h>
 #include <set>
 #include <algorithm>
 
-namespace ivy {
+namespace ivy::gfx {
 
 constexpr u32 VULKAN_API_VERSION = VK_API_VERSION_1_1;
 

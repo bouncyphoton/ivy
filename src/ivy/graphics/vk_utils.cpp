@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <algorithm>
 
-namespace ivy {
+namespace ivy::gfx {
 
 const char *vk_result_to_string(VkResult result) {
 #define VULKAN_CASE(x) case x: return #x;
