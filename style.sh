@@ -27,5 +27,4 @@ astyle \
 --suffix=none \
 --recursive \
 --verbose \
---lineend=linux \
 ./src/*.cpp,*.h
