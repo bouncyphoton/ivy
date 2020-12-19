@@ -1,7 +1,7 @@
 #ifndef IVY_RENDERER_H
 #define IVY_RENDERER_H
 
-#include "ivy/graphics/render_context.h"
+#include "ivy/graphics/render_device.h"
 
 namespace ivy {
 
@@ -22,7 +22,7 @@ public:
     void render();
 
 private:
-    gfx::RenderContext ctx_;
+    gfx::RenderDevice device_;
 };
 
 }

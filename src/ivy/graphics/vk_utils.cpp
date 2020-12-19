@@ -2,6 +2,7 @@
 #include "ivy/types.h"
 #include <GLFW/glfw3.h>
 #include <algorithm>
+#include <fstream>
 
 namespace ivy::gfx {
 
@@ -130,6 +131,30 @@ std::vector<VkPresentModeKHR> getPresentModes(VkPhysicalDevice physical_device, 
     vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &numPresentModes, presentModes.data());
 
     return presentModes;
+}
+
+VkShaderModule loadShader(VkDevice device, const std::string &shader_path) {
+    std::vector<char> code;
+
+    if (std::ifstream file = std::ifstream(shader_path, std::ios::ate | std::ios::binary)) {
+        u32 size = file.tellg();
+        code.resize(size);
+        file.seekg(0);
+        file.read(code.data(), size);
+    } else {
+        Log::fatal("Failed to load shader '%s'", shader_path.c_str());
+    }
+
+    VkShaderModuleCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.flags = 0;
+    createInfo.codeSize = code.size();
+    createInfo.pCode = reinterpret_cast<u32 *>(code.data());
+
+    VkShaderModule shaderModule;
+    VK_CHECKF(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule));
+
+    return shaderModule;
 }
 
 }
