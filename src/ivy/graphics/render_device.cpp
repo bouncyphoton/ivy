@@ -1,12 +1,13 @@
 #include "render_device.h"
 #include "vk_utils.h"
-#include "ivy/types.h"
 #include "ivy/consts.h"
-#include "ivy/engine.h"
 #include "ivy/platform/platform.h"
+
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
+
 #include <GLFW/glfw3.h>
 #include <set>
-#include <algorithm>
 
 namespace ivy::gfx {
 
@@ -123,6 +124,21 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     vkGetDeviceQueue(device_, graphicsFamilyIndex_, 0, &graphicsQueue_);
     vkGetDeviceQueue(device_, computeFamilyIndex_, 0, &computeQueue_);
     vkGetDeviceQueue(device_, presentFamilyIndex_, 0, &presentQueue_);
+
+    //----------------------------------
+    // Vulkan Memory Allocator
+    //----------------------------------
+
+    VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.vulkanApiVersion = VULKAN_API_VERSION;
+    allocatorInfo.physicalDevice = physicalDevice_;
+    allocatorInfo.device = device_;
+    allocatorInfo.instance = instance_;
+
+    VK_CHECKF(vmaCreateAllocator(&allocatorInfo, &allocator_));
+    cleanupStack_.emplace([ = ]() {
+        vmaDestroyAllocator(allocator_);
+    });
 
     //----------------------------------
     // Create our swapchain

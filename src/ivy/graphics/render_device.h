@@ -5,6 +5,7 @@
 #include "ivy/options.h"
 #include "ivy/graphics/command_buffer.h"
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 #include <vector>
 #include <string>
 #include <stack>
@@ -154,6 +155,8 @@ private:
     VkQueue graphicsQueue_;
     VkQueue computeQueue_;
     VkQueue presentQueue_;
+
+    VmaAllocator allocator_;
 
     VkSwapchainKHR swapchain_;
     VkExtent2D swapchainExtent_;

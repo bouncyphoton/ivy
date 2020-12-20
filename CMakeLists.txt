@@ -18,9 +18,21 @@ target_link_libraries(ivy glfw)
 find_package(Vulkan REQUIRED)
 target_link_libraries(ivy Vulkan::Vulkan)
 
+# Vulkan Memory Allocator (VMA)
+SET(VMA_SRC ${PROJECT_SOURCE_DIR}/external/VulkanMemoryAllocator/src)
+target_include_directories(ivy PRIVATE ${VMA_SRC})
+
 # Set compile options
 if (MSVC)
+    # Treat warnings as errors
     target_compile_options(ivy PRIVATE /W4 /WX)
+
+    # Ignore warnings from VMA
+    target_compile_options(ivy PRIVATE /experimental:external /external:I ${VMA_SRC})
 else()
+    # Treat warnings as errors
     target_compile_options(ivy PRIVATE -Wall -Wextra -pedantic -Werror)
+
+    # Ignore warnings from VMA
+    target_compile_options(ivy PRIVATE -isystem ${VMA_SRC})
 endif()
