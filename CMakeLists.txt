@@ -28,7 +28,7 @@ if (MSVC)
     target_compile_options(ivy PRIVATE /W4 /WX)
 
     # Ignore warnings from VMA
-    target_compile_options(ivy PRIVATE /experimental:external /external:I ${VMA_SRC})
+    target_compile_options(ivy PRIVATE /experimental:external /external:W0 /external:I ${VMA_SRC})
 else()
     # Treat warnings as errors
     target_compile_options(ivy PRIVATE -Wall -Wextra -pedantic -Werror)
