@@ -6,9 +6,9 @@ namespace ivy {
 
 // TODO: remove temp vertices
 gfx::VertexP3C3 vertices[] = {
-    {0.0f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f},
-    {0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f},
-    {-0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f}
+    gfx::VertexP3C3({0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}),
+    gfx::VertexP3C3({0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}),
+    gfx::VertexP3C3({-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f})
 };
 
 Renderer::Renderer(const Options &options, const Platform &platform)

@@ -22,6 +22,9 @@ target_link_libraries(ivy Vulkan::Vulkan)
 SET(VMA_SRC ${PROJECT_SOURCE_DIR}/external/VulkanMemoryAllocator/src)
 target_include_directories(ivy PRIVATE ${VMA_SRC})
 
+# GLM
+target_include_directories(ivy PRIVATE external/glm)
+
 # Set compile options
 if (MSVC)
     # Treat warnings as errors
