@@ -32,8 +32,24 @@ void CommandBuffer::executeRenderPass(VkRenderPass render_pass, Framebuffer fram
     vkCmdEndRenderPass(commandBuffer_);
 }
 
+void CommandBuffer::bindVertexBuffer(VkBuffer buffer) {
+    VkDeviceSize offsets[] = { 0 };
+
+    vkCmdBindVertexBuffers(commandBuffer_, 0, 1, &buffer, offsets);
+}
+
 void CommandBuffer::draw(u32 num_vertices, u32 num_instances, u32 first_vertex, u32 first_instance) {
     vkCmdDraw(commandBuffer_, num_vertices, num_instances, first_vertex, first_instance);
+}
+
+void CommandBuffer::copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, VkDeviceSize dst_offset,
+                               VkDeviceSize src_offset) {
+    VkBufferCopy region = {};
+    region.size = size;
+    region.dstOffset = dst_offset;
+    region.srcOffset = src_offset;
+
+    vkCmdCopyBuffer(commandBuffer_, src, dst, 1, &region);
 }
 
 }

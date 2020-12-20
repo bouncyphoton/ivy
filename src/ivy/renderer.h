@@ -25,6 +25,7 @@ private:
     gfx::RenderDevice device_;
     VkRenderPass renderPass_;
     VkPipeline graphicsPipeline_;
+    VkBuffer vertexBuffer_;
 };
 
 }

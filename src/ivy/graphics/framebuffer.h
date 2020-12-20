@@ -11,6 +11,8 @@ namespace ivy::gfx {
  */
 class Framebuffer {
 public:
+    Framebuffer(VkFramebuffer framebuffer, VkExtent2D extent)
+        : framebuffer_(framebuffer), extent_(extent) {}
 
     [[nodiscard]] VkFramebuffer getVkFramebuffer() const {
         return framebuffer_;
@@ -21,11 +23,6 @@ public:
     }
 
 private:
-    friend class RenderDevice;
-
-    Framebuffer(VkFramebuffer framebuffer, VkExtent2D extent)
-        : framebuffer_(framebuffer), extent_(extent) {}
-
     VkFramebuffer framebuffer_;
     VkExtent2D extent_;
 };

@@ -1,7 +1,15 @@
 #include "renderer.h"
 #include "ivy/log.h"
+#include "ivy/graphics/vertex.h"
 
 namespace ivy {
+
+// TODO: remove temp vertices
+gfx::VertexP3C3 vertices[] = {
+    {0.0f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f},
+    {0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f},
+    {-0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f}
+};
 
 Renderer::Renderer(const Options &options, const Platform &platform)
     : device_(options, platform) {
@@ -27,8 +35,12 @@ Renderer::Renderer(const Options &options, const Platform &platform)
      *        .build();
      *
      * pass.execute(framebuffer, []() {
-     *     // ???
-     *     // How to handle subpasses?
+     *     ...
+     *     cmd.draw();
+     *
+     *     cmd.nextSubpass();
+     *     ...
+     *     cmd.draw();
      * });
      */
 
@@ -103,14 +115,17 @@ Renderer::Renderer(const Options &options, const Platform &platform)
         shaders.emplace_back(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/triangle.frag.spv");
 
         // Get vertex description
-        // gfx::VertexDescription vertexDescription(Vertex::getBindingDescriptions(), Vertex::getAttributeDescriptions());
-        gfx::VertexDescription vertexDescription;
+        gfx::VertexDescription vertexDescription(gfx::VertexP3C3::getBindingDescriptions(),
+                                                 gfx::VertexP3C3::getAttributeDescriptions());
 
         // Create pipeline layout
         VkPipelineLayout layout = device_.createLayout();
 
         graphicsPipeline_ = device_.createGraphicsPipeline(shaders, vertexDescription, layout, renderPass_);
     }
+
+    // Create vertex buffer
+    vertexBuffer_ = device_.createVertexBuffer(vertices, sizeof(vertices[0]) * COUNTOF(vertices));
 }
 
 Renderer::~Renderer() {
@@ -123,7 +138,8 @@ void Renderer::render() {
 
     cmd.bindGraphicsPipeline(graphicsPipeline_);
     cmd.executeRenderPass(renderPass_, device_.getSwapchainFramebuffer(renderPass_), [&]() {
-        cmd.draw(3, 1, 0, 0);
+        cmd.bindVertexBuffer(vertexBuffer_);
+        cmd.draw(COUNTOF(vertices), 1, 0, 0);
     });
 
     device_.endFrame();

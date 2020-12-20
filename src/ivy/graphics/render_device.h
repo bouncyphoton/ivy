@@ -86,6 +86,13 @@ public:
     CommandBuffer getCommandBuffer();
 
     /**
+     * \brief Get and submit a command buffer for recording one time commands (like a buffer copy)
+     * \param queue The queue the command buffer should be submitted to
+     * \param record_func A function that records commands into a command buffer
+     */
+    void submitOneTimeCommands(VkQueue queue, const std::function<void(CommandBuffer)> &record_func);
+
+    /**
      * \brief Get format of swapchain image views
      * \return Swapchain format
      */
@@ -127,6 +134,14 @@ public:
      * \return Current framebuffer
      */
     Framebuffer getSwapchainFramebuffer(VkRenderPass render_pass);
+
+    /**
+     * \brief Create a vertex buffer with the lifetime of the render device
+     * \param data Pointer to vertex data
+     * \param size Size of vertex data in bytes
+     * \return VkBuffer
+     */
+    VkBuffer createVertexBuffer(void *data, VkDeviceSize size);
 
 private:
     /**
