@@ -533,7 +533,7 @@ VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
         // If the memory happens to be mappable, no need for staging buffer
         void *mappedData;
         vmaMapMemory(allocator_, vertexAllocation, &mappedData);
-        memcpy(mappedData, data, size);
+        memcpy(mappedData, data, (size_t) size);
         vmaUnmapMemory(allocator_, vertexAllocation);
     } else {
         // Otherwise, we need a staging buffer
@@ -554,7 +554,7 @@ VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
                                   &stagingAllocInfo));
 
         // Copy data into staging buffer
-        memcpy(stagingAllocInfo.pMappedData, data, size);
+        memcpy(stagingAllocInfo.pMappedData, data, (size_t) size);
 
         // Copy staging buffer into vertex buffer
         submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
