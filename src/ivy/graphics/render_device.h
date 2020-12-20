@@ -1,11 +1,13 @@
 #ifndef IVY_RENDER_DEVICE_H
 #define IVY_RENDER_DEVICE_H
 
-#include <ivy/types.h>
+#include "ivy/types.h"
+#include "ivy/options.h"
+#include "ivy/graphics/command_buffer.h"
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <string>
-#include <queue>
+#include <stack>
 #include <functional>
 
 namespace ivy {
@@ -20,18 +22,17 @@ class Shader {
 public:
     enum class StageEnum {
         VERTEX = VK_SHADER_STAGE_VERTEX_BIT,
-        GEOMETRY = VK_SHADER_STAGE_GEOMETRY_BIT,
         FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT,
-        COMPUTE = VK_SHADER_STAGE_COMPUTE_BIT
+        // TODO: geometry and compute
     };
 
     Shader(StageEnum stage, const std::string &path) : stage_(stage), path_(path) {}
 
-    VkShaderStageFlagBits getStage() const {
+    [[nodiscard]] VkShaderStageFlagBits getStage() const {
         return static_cast<VkShaderStageFlagBits>(stage_);
     }
 
-    std::string getShaderPath() const {
+    [[nodiscard]] std::string getShaderPath() const {
         return path_;
     }
 
@@ -42,25 +43,25 @@ private:
 
 class VertexDescription {
 public:
-    VertexDescription(VkVertexInputBindingDescription binding,
-                      const std::vector<VkVertexInputAttributeDescription> &attributes) :
-        binding_(binding), attributes_(attributes) {}
+    VertexDescription(const std::vector<VkVertexInputBindingDescription> &bindings = {},
+                      const std::vector<VkVertexInputAttributeDescription> &attributes = {}) :
+        bindings_(bindings), attributes_(attributes) {}
 
-    const VkVertexInputBindingDescription &getBinding() const {
-        return binding_;
+    [[nodiscard]] const std::vector<VkVertexInputBindingDescription> &getBindings() const {
+        return bindings_;
     }
 
-    const std::vector<VkVertexInputAttributeDescription> &getAttributes() const {
+    [[nodiscard]] const std::vector<VkVertexInputAttributeDescription> &getAttributes() const {
         return attributes_;
     }
 
 private:
-    VkVertexInputBindingDescription binding_;
+    std::vector<VkVertexInputBindingDescription> bindings_;
     std::vector<VkVertexInputAttributeDescription> attributes_;
 };
 
 /**
- * \brief Abstraction around logical device for rendering
+ * \brief Wrapper around logical device for rendering
  */
 class RenderDevice final {
 public:
@@ -68,10 +69,26 @@ public:
     ~RenderDevice();
 
     /**
+     * \brief Prepare and begin a frame for rendering
+     */
+    void beginFrame();
+
+    /**
+     * \brief Finish frame and present
+     */
+    void endFrame();
+
+    /**
+     * \brief Get the command buffer for the current frame
+     * \return Command buffer for current frame
+     */
+    CommandBuffer getCommandBuffer();
+
+    /**
      * \brief Get format of swapchain image views
      * \return Swapchain format
      */
-    VkFormat getSwapchainFormat() const {
+    [[nodiscard]] VkFormat getSwapchainFormat() const {
         return swapchainFormat_;
     }
 
@@ -103,7 +120,12 @@ public:
     VkPipeline createGraphicsPipeline(const std::vector<Shader> &shaders, const VertexDescription &vertex_description,
                                       VkPipelineLayout layout, VkRenderPass render_pass);
 
-    // TODO: presentation
+    /**
+     * \brief Get (or create if doesn't exist) the current swapchain framebuffer for a given render pass
+     * \param render_pass The framebuffer's render pass
+     * \return Current framebuffer
+     */
+    Framebuffer getSwapchainFramebuffer(VkRenderPass render_pass);
 
 private:
     /**
@@ -116,9 +138,9 @@ private:
      */
     void createSwapchain();
 
-    const Options &options_;
+    const Options options_;
 
-    std::queue<std::function<void()>> cleanupQueue_;
+    std::stack<std::function<void()>> cleanupStack_;
 
     VkInstance instance_ = VK_NULL_HANDLE;
     VkSurfaceKHR surface_ = VK_NULL_HANDLE;
@@ -138,6 +160,16 @@ private:
     VkFormat swapchainFormat_;
     std::vector<VkImage> swapchainImages_;
     std::vector<VkImageView> swapchainImageViews_;
+    std::unordered_map<VkRenderPass, std::vector<Framebuffer>> swapchainFramebuffers_;
+
+    VkCommandPool commandPool_;
+    std::vector<VkCommandBuffer> commandBuffers_;
+
+    u32 currentFrame_ = 0;
+    u32 swapImageIndex_ = 0;
+    std::vector<VkSemaphore> imageAvailableSemaphores_;
+    std::vector<VkSemaphore> renderFinishedSemaphores_;
+    std::vector<VkFence> inFlightFences_;
 };
 
 }

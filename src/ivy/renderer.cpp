@@ -3,42 +3,6 @@
 
 namespace ivy {
 
-// TODO: remove temp vertex
-struct Vertex {
-    // TODO: glm
-    f32 p1, p2, p3;
-    f32 c1, c2, c3;
-
-    static VkVertexInputBindingDescription getBindingDescription() {
-        VkVertexInputBindingDescription desc = {};
-        desc.binding = 0;
-        desc.stride = sizeof(Vertex);
-        desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return desc;
-    }
-
-    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-        std::vector<VkVertexInputAttributeDescription> attributes;
-
-        // pos
-        attributes.emplace_back();
-        attributes.back().binding = 0;
-        attributes.back().location = 0;
-        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributes.back().offset = offsetof(Vertex, p1);
-
-        // color
-        attributes.emplace_back();
-        attributes.back().binding = 0;
-        attributes.back().location = 1;
-        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributes.back().offset = offsetof(Vertex, c1);
-
-        return attributes;
-    }
-};
-
 Renderer::Renderer(const Options &options, const Platform &platform)
     : device_(options, platform) {
     LOG_CHECKPOINT();
@@ -90,8 +54,6 @@ Renderer::Renderer(const Options &options, const Platform &platform)
         // Attachment reference
         VkAttachmentReference ref = {};
         ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        // an integer value identifying an attachment at the corresponding index in VkRenderPassCreateInfo::pAttachments
         ref.attachment = 0;
 
         colorAttachmentReferences.emplace_back(ref);
@@ -126,41 +88,45 @@ Renderer::Renderer(const Options &options, const Platform &platform)
         dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dependency.srcAccessMask = 0;
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        dependency.dependencyFlags = 0;
 
         subpassDependencies.emplace_back(dependency);
     }
 
     // Create render pass
-    VkRenderPass renderPass = device_.createRenderPass(attachments, subpasses, subpassDependencies);
-
-    // Create pipeline layout
-    VkPipelineLayout layout = device_.createLayout();
+    renderPass_ = device_.createRenderPass(attachments, subpasses, subpassDependencies);
 
     // Create graphics pipeline
-    VkPipeline graphicsPipeline;
     {
+        // Get shaders
         std::vector<gfx::Shader> shaders;
         shaders.emplace_back(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/triangle.vert.spv");
         shaders.emplace_back(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/triangle.frag.spv");
 
-        gfx::VertexDescription vertexDescription(Vertex::getBindingDescription(), Vertex::getAttributeDescriptions());
+        // Get vertex description
+        // gfx::VertexDescription vertexDescription(Vertex::getBindingDescriptions(), Vertex::getAttributeDescriptions());
+        gfx::VertexDescription vertexDescription;
 
-        graphicsPipeline = device_.createGraphicsPipeline(shaders, vertexDescription, layout, renderPass);
+        // Create pipeline layout
+        VkPipelineLayout layout = device_.createLayout();
+
+        graphicsPipeline_ = device_.createGraphicsPipeline(shaders, vertexDescription, layout, renderPass_);
     }
-
-    (void)graphicsPipeline;
-
-    // TODO: framebuffer
 }
 
 Renderer::~Renderer() {
     LOG_CHECKPOINT();
-    // TODO
 }
 
 void Renderer::render() {
-    // TODO
+    device_.beginFrame();
+    gfx::CommandBuffer cmd = device_.getCommandBuffer();
+
+    cmd.bindGraphicsPipeline(graphicsPipeline_);
+    cmd.executeRenderPass(renderPass_, device_.getSwapchainFramebuffer(renderPass_), [&]() {
+        cmd.draw(3, 1, 0, 0);
+    });
+
+    device_.endFrame();
 }
 
 }

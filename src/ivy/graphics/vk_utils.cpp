@@ -137,7 +137,7 @@ VkShaderModule loadShader(VkDevice device, const std::string &shader_path) {
     std::vector<char> code;
 
     if (std::ifstream file = std::ifstream(shader_path, std::ios::ate | std::ios::binary)) {
-        u32 size = file.tellg();
+        u32 size = (u32) file.tellg();
         code.resize(size);
         file.seekg(0);
         file.read(code.data(), size);

@@ -1,18 +1,9 @@
 #ifndef IVY_ENGINE_H
 #define IVY_ENGINE_H
 
-#include "ivy/types.h"
+#include "ivy/options.h"
 
 namespace ivy {
-
-/**
- * \brief Engine options
- */
-struct Options {
-    u32 renderWidth = 1280;
-    u32 renderHeight = 720;
-    const char *appName = "ivy";
-};
 
 /**
  * \brief The core engine, everything runs from here
