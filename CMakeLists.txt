@@ -3,7 +3,7 @@ project(ivy)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(ivy src/main.cpp src/ivy/engine.cpp src/ivy/engine.h src/ivy/types.h src/ivy/renderer.cpp src/ivy/renderer.h src/ivy/platform/platform.cpp src/ivy/platform/platform.h src/ivy/log.h src/ivy/utils/utils.cpp src/ivy/utils/utils.h src/ivy/graphics/render_context.cpp src/ivy/graphics/render_context.h src/ivy/graphics/vk_utils.cpp src/ivy/graphics/vk_utils.h src/ivy/consts.h)
+add_executable(ivy src/main.cpp src/ivy/engine.cpp src/ivy/engine.h src/ivy/types.h src/ivy/renderer.cpp src/ivy/renderer.h src/ivy/platform/platform.cpp src/ivy/platform/platform.h src/ivy/log.h src/ivy/utils/utils.cpp src/ivy/utils/utils.h src/ivy/graphics/render_device.cpp src/ivy/graphics/render_device.h src/ivy/graphics/vk_utils.cpp src/ivy/graphics/vk_utils.h src/ivy/consts.h src/ivy/graphics/command_buffer.cpp src/ivy/graphics/command_buffer.h src/ivy/options.h src/ivy/graphics/framebuffer.h src/ivy/graphics/vertex.h)
 target_include_directories(ivy PRIVATE src/)
 
 # GLFW
@@ -18,9 +18,24 @@ target_link_libraries(ivy glfw)
 find_package(Vulkan REQUIRED)
 target_link_libraries(ivy Vulkan::Vulkan)
 
+# Vulkan Memory Allocator (VMA)
+SET(VMA_SRC ${PROJECT_SOURCE_DIR}/external/VulkanMemoryAllocator/src)
+target_include_directories(ivy PRIVATE ${VMA_SRC})
+
+# GLM
+target_include_directories(ivy PRIVATE external/glm)
+
 # Set compile options
 if (MSVC)
+    # Treat warnings as errors
     target_compile_options(ivy PRIVATE /W4 /WX)
+
+    # Ignore warnings from VMA
+    target_compile_options(ivy PRIVATE /experimental:external /external:W0 /external:I ${VMA_SRC})
 else()
+    # Treat warnings as errors
     target_compile_options(ivy PRIVATE -Wall -Wextra -pedantic -Werror)
+
+    # Ignore warnings from VMA
+    target_compile_options(ivy PRIVATE -isystem ${VMA_SRC})
 endif()

@@ -1,7 +1,6 @@
 #ifndef IVY_PLATFORM_H
 #define IVY_PLATFORM_H
 
-// TODO: hide GLFW
 typedef struct GLFWwindow GLFWwindow;
 
 namespace ivy {

@@ -14,13 +14,6 @@ namespace consts {
 constexpr const char *ENGINE_NAME = "ivy";
 
 //----------------------------------
-// Renderer
-//----------------------------------
-
-constexpr u32 DESIRED_SWAPCHAIN_IMAGES = 3;
-constexpr VkPresentModeKHR DESIRED_PRESENT_MODE = VK_PRESENT_MODE_MAILBOX_KHR;
-
-//----------------------------------
 // Development
 //----------------------------------
 

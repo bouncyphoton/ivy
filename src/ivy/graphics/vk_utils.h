@@ -4,6 +4,7 @@
 #include "ivy/log.h"
 #include <vulkan/vulkan.h>
 #include <vector>
+#include <string>
 
 namespace ivy::gfx {
 
@@ -53,19 +54,27 @@ std::vector<VkSurfaceFormatKHR> getSurfaceFormats(VkPhysicalDevice physical_devi
  */
 std::vector<VkPresentModeKHR> getPresentModes(VkPhysicalDevice physical_device, VkSurfaceKHR surface);
 
+/**
+ * \brief Create a shader module from a file
+ * \param device
+ * \param shader_path Path to shader code
+ * \return The created shader module
+ */
+VkShaderModule loadShader(VkDevice device, const std::string &shader_path);
+
 }
 
 /**
  * \brief Check a VkResult, fatal error if not VK_SUCCESS
  */
 #define VK_CHECKF(x) do { VkResult result = (x); if (result != VK_SUCCESS) { \
-            ivy::Log::fatal("%s:%d: [%s] %s", __FILE__, __LINE__, vk_result_to_string(result), #x); } } while (0)
+            ivy::Log::fatal("%s:%d: [%s] %s", __FILE__, __LINE__, ivy::gfx::vk_result_to_string(result), #x); } } while (0)
 
 /**
  * \brief Check a VkResult, warn if not VK_SUCCESS
  */
 #define VK_CHECKW(x) do { VkResult result = (x); if (result != VK_SUCCESS) { \
-            ivy::Log::warn("%s:%d: [%s] %s", __FILE__, __LINE__, vk_result_to_string(result), #x); } } while (0)
+            ivy::Log::warn("%s:%d: [%s] %s", __FILE__, __LINE__, ivy::gfx::vk_result_to_string(result), #x); } } while (0)
 
 /**
  * \brief Separate a VK_VERSION into major, minor, patch
