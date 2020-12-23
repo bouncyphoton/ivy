@@ -2,6 +2,7 @@
 #define IVY_RENDERER_H
 
 #include "ivy/graphics/render_device.h"
+#include "ivy/graphics/graphics_pass.h"
 
 namespace ivy {
 
@@ -23,8 +24,7 @@ public:
 
 private:
     gfx::RenderDevice device_;
-    VkRenderPass renderPass_;
-    VkPipeline graphicsPipeline_;
+    std::vector<gfx::GraphicsPass> passes_;
     VkBuffer vertexBuffer_;
 };
 
