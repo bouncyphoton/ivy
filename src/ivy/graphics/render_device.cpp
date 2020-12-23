@@ -357,7 +357,7 @@ VkPipelineLayout RenderDevice::createLayout() {
 
 VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shaders,
                                                 const VertexDescription &vertex_description, VkPipelineLayout layout,
-                                                VkRenderPass render_pass) {
+                                                VkRenderPass render_pass, u32 subpass) {
     // Generate shader stages
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages(shaders.size());
     for (u32 i = 0; i < shaders.size(); ++i) {
@@ -456,7 +456,7 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     ci.pDynamicState = nullptr; // TODO: dynamic state
     ci.layout = layout;
     ci.renderPass = render_pass;
-    ci.subpass = 0;
+    ci.subpass = subpass;
     ci.basePipelineHandle = VK_NULL_HANDLE;
     ci.basePipelineIndex = -1;
 

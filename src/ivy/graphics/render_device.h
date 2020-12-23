@@ -4,6 +4,7 @@
 #include "ivy/types.h"
 #include "ivy/options.h"
 #include "ivy/graphics/command_buffer.h"
+#include "ivy/graphics/shader.h"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <vector>
@@ -18,29 +19,6 @@ struct Options;
 }
 
 namespace ivy::gfx {
-
-class Shader {
-public:
-    enum class StageEnum {
-        VERTEX = VK_SHADER_STAGE_VERTEX_BIT,
-        FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT,
-        // TODO: geometry and compute
-    };
-
-    Shader(StageEnum stage, const std::string &path) : stage_(stage), path_(path) {}
-
-    [[nodiscard]] VkShaderStageFlagBits getStage() const {
-        return static_cast<VkShaderStageFlagBits>(stage_);
-    }
-
-    [[nodiscard]] std::string getShaderPath() const {
-        return path_;
-    }
-
-private:
-    StageEnum stage_;
-    std::string path_;
-};
 
 class VertexDescription {
 public:
@@ -123,10 +101,11 @@ public:
      * \param vertex_description Vertex description for shaders
      * \param layout Pipeline layout
      * \param render_pass Render pass
+     * \param subpass Subpass index
      * \return VkPipeline
      */
     VkPipeline createGraphicsPipeline(const std::vector<Shader> &shaders, const VertexDescription &vertex_description,
-                                      VkPipelineLayout layout, VkRenderPass render_pass);
+                                      VkPipelineLayout layout, VkRenderPass render_pass, u32 subpass = 0);
 
     /**
      * \brief Get (or create if doesn't exist) the current swapchain framebuffer for a given render pass
