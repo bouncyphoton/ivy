@@ -3,6 +3,7 @@
 
 #include "ivy/types.h"
 #include "ivy/graphics/framebuffer.h"
+#include "ivy/graphics/graphics_pass.h"
 #include <vulkan/vulkan.h>
 #include <functional>
 
@@ -18,7 +19,9 @@ public:
 
     void bindGraphicsPipeline(VkPipeline pipeline);
 
-    void executeRenderPass(VkRenderPass render_pass, Framebuffer framebuffer, const std::function<void()> &func);
+    void executeGraphicsPass(const GraphicsPass &pass, Framebuffer framebuffer, const std::function<void()> &func);
+
+    void nextSubpass();
 
     void bindVertexBuffer(VkBuffer buffer);
 

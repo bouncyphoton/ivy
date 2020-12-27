@@ -1,14 +1,22 @@
 #ifndef IVY_GRAPHICS_PASS_H
 #define IVY_GRAPHICS_PASS_H
 
-#include "ivy/graphics/render_device.h"
+#include "ivy/graphics/shader.h"
+#include "ivy/graphics/vertex_description.h"
 #include <vulkan/vulkan.h>
 #include <unordered_map>
-#include <utility>
+#include <vector>
 
 namespace ivy::gfx {
 
-// TODO: this file is a little ugly/hard to read. Names could be improved
+class RenderDevice;
+
+// TODO: this file is a little ugly/hard to read. Names of structures could be improved/re-organized
+
+struct AttachmentDescription {
+    VkAttachmentDescription vkAttachmentDescription;
+    VkImageUsageFlags usage;
+};
 
 /**
  * \brief Wrapper around Vulkan render passes for graphics
@@ -20,8 +28,10 @@ public:
      */
     inline static const char *SwapchainName = "__swapchain";
 
-    explicit GraphicsPass(VkRenderPass render_pass, const std::vector<VkPipeline> &subpass_pipelines)
-        : renderPass_(render_pass), subpassPipelines_(subpass_pipelines) {}
+    explicit GraphicsPass(VkRenderPass render_pass, const std::vector<VkPipeline> &subpass_pipelines,
+                          const std::unordered_map<std::string, AttachmentDescription> &attachment_descriptions)
+        : renderPass_(render_pass), subpassPipelines_(subpass_pipelines),
+          attachmentDescriptions_(attachment_descriptions) {}
 
     [[nodiscard]] VkRenderPass getVkRenderPass() const {
         return renderPass_;
@@ -31,9 +41,14 @@ public:
         return subpassPipelines_;
     }
 
+    [[nodiscard]] const std::unordered_map<std::string, AttachmentDescription> &getAttachmentDescriptions() const {
+        return attachmentDescriptions_;
+    }
+
 private:
     VkRenderPass renderPass_;
     std::vector<VkPipeline> subpassPipelines_;
+    std::unordered_map<std::string, AttachmentDescription> attachmentDescriptions_;
 };
 
 struct SubpassDescription {
@@ -43,6 +58,7 @@ private:
 
     std::vector<Shader> shaders_;
     VertexDescription vertexDescription_;
+    std::vector<std::string> inputAttachmentNames_;
     std::vector<std::string> colorAttachmentNames_;
 };
 
@@ -55,6 +71,8 @@ public:
 
     SubpassBuilder &addVertexDescription(const std::vector<VkVertexInputBindingDescription> &bindings = {},
                                          const std::vector<VkVertexInputAttributeDescription> &attributes = {});
+
+    SubpassBuilder &addInputAttachment(const std::string &attachment_name);
 
     SubpassBuilder &addColorAttachment(const std::string &attachment_name);
 
@@ -69,9 +87,13 @@ public:
     explicit GraphicsPassBuilder(RenderDevice &device)
         : device_(device) {}
 
-    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format, VkAttachmentLoadOp load_op,
-                                       VkAttachmentStoreOp store_op, VkAttachmentLoadOp stencil_load_op,
-                                       VkAttachmentStoreOp stencil_store_op, VkImageLayout initial_layout, VkImageLayout final_layout);
+    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format,
+                                       VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                       VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE,
+                                       VkAttachmentLoadOp stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                       VkAttachmentStoreOp stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                       VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                       VkImageLayout final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     GraphicsPassBuilder &addAttachmentSwapchain();
 
@@ -93,7 +115,7 @@ private:
     };
 
     RenderDevice &device_;
-    std::unordered_map<std::string, VkAttachmentDescription> attachments_;
+    std::unordered_map<std::string, AttachmentDescription> attachments_;
     std::unordered_map<std::string, SubpassDescription> subpassDescriptions_;
     std::vector<std::string> subpassOrder_;
     std::vector<SubpassDependency> subpassDependencies_;

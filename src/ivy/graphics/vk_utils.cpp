@@ -6,8 +6,9 @@
 
 namespace ivy::gfx {
 
-const char *vk_result_to_string(VkResult result) {
 #define VULKAN_CASE(x) case x: return #x;
+
+const char *vk_result_to_string(VkResult result) {
     switch (result) {
             VULKAN_CASE(VK_SUCCESS)
             VULKAN_CASE(VK_NOT_READY)
@@ -51,8 +52,31 @@ const char *vk_result_to_string(VkResult result) {
         default:
             return "Unknown";
     }
-#undef VULKAN_CASE
 }
+
+const char *vk_descriptor_type_to_string(VkDescriptorType type) {
+    switch (type) {
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_SAMPLER)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV)
+        VULKAN_CASE(VK_DESCRIPTOR_TYPE_MAX_ENUM)
+        default:
+            return "Unknown";
+    }
+}
+
+#undef VULKAN_CASE
 
 VkExtent2D clamp(VkExtent2D x, VkExtent2D min_ext, VkExtent2D max_ext) {
     return {

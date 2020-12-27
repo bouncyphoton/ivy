@@ -336,18 +336,31 @@ VkRenderPass RenderDevice::createRenderPass(const std::vector<VkAttachmentDescri
     return renderPass;
 }
 
-VkPipelineLayout RenderDevice::createLayout() {
-    VkPipelineLayoutCreateInfo ci = {};
-    ci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    ci.pNext = nullptr;
-    ci.flags = 0;
-    ci.setLayoutCount = 0;
-    ci.pSetLayouts = nullptr;
-    ci.pushConstantRangeCount = 0;
-    ci.pPushConstantRanges = nullptr;
+VkPipelineLayout RenderDevice::createLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings = {}) {
+    // Create descriptor set layouts
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI = {};
+    descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptorSetLayoutCI.bindingCount = (u32) bindings.size();
+    descriptorSetLayoutCI.pBindings = bindings.data();
+
+    VkDescriptorSetLayout setLayout;
+    VK_CHECKF(vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr, &setLayout));
+    cleanupStack_.emplace([ = ]() {
+        vkDestroyDescriptorSetLayout(device_, setLayout, nullptr);
+    });
+
+    // Create pipeline layout
+    VkPipelineLayoutCreateInfo layoutCI = {};
+    layoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutCI.pNext = nullptr;
+    layoutCI.flags = 0;
+    layoutCI.setLayoutCount = 1;
+    layoutCI.pSetLayouts = &setLayout;
+    layoutCI.pushConstantRangeCount = 0;
+    layoutCI.pPushConstantRanges = nullptr;
 
     VkPipelineLayout layout;
-    VK_CHECKF(vkCreatePipelineLayout(device_, &ci, nullptr, &layout));
+    VK_CHECKF(vkCreatePipelineLayout(device_, &layoutCI, nullptr, &layout));
     cleanupStack_.emplace([ = ]() {
         vkDestroyPipelineLayout(device_, layout, nullptr);
     });
@@ -357,7 +370,7 @@ VkPipelineLayout RenderDevice::createLayout() {
 
 VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shaders,
                                                 const VertexDescription &vertex_description, VkPipelineLayout layout,
-                                                VkRenderPass render_pass, u32 subpass) {
+                                                VkRenderPass render_pass, u32 subpass, u32 num_color_attachments) {
     // Generate shader stages
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages(shaders.size());
     for (u32 i = 0; i < shaders.size(); ++i) {
@@ -428,16 +441,19 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     // depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 
     // Color blending
-    VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
-    colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                               VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachmentState.blendEnable = VK_FALSE;
+    VkPipelineColorBlendAttachmentState blendState = {};
+    blendState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    blendState.blendEnable = VK_FALSE;
+
+    // We don't have independent blending enabled, so these must be the same for all attachments
+    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachmentStates(num_color_attachments, blendState);
 
     VkPipelineColorBlendStateCreateInfo colorBlendCreateInfo = {};
     colorBlendCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlendCreateInfo.logicOpEnable = VK_FALSE;
-    colorBlendCreateInfo.attachmentCount = 1;
-    colorBlendCreateInfo.pAttachments = &colorBlendAttachmentState;
+    colorBlendCreateInfo.attachmentCount = (u32) colorBlendAttachmentStates.size();
+    colorBlendCreateInfo.pAttachments = colorBlendAttachmentStates.data();
 
     VkGraphicsPipelineCreateInfo ci = {};
     ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -473,19 +489,88 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     return graphicsPipeline;
 }
 
-Framebuffer RenderDevice::getSwapchainFramebuffer(VkRenderPass render_pass) {
+Framebuffer RenderDevice::getFramebuffer(const GraphicsPass &pass) {
+    VkRenderPass renderPass = pass.getVkRenderPass();
+
     // Create framebuffers if they don't exist
-    if (swapchainFramebuffers_[render_pass].size() != swapchainImageViews_.size()) {
+    if (swapchainFramebuffers_[renderPass].size() != swapchainImageViews_.size()) {
         for (VkImageView &swapchainImageView : swapchainImageViews_) {
-            VkImageView attachments[] = {
-                swapchainImageView
-            };
+            const std::unordered_map<std::string, AttachmentDescription> &descriptions = pass.getAttachmentDescriptions();
+            std::vector<VkImageView> attachmentViews;
+
+            for (const auto &attachment : descriptions) {
+                if (attachment.first == GraphicsPass::SwapchainName) {
+                    attachmentViews.emplace_back(swapchainImageView);
+                } else {
+                    const AttachmentDescription &desc = attachment.second;
+
+                    // TODO: support non-2D attachments (imageCI.imageType, imageCI.extent, imageViewCI.viewType) ?
+                    // TODO: support non-swapchain-sized attachments ?
+
+                    VkImageCreateInfo imageCI = {};
+                    imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+                    imageCI.imageType = VK_IMAGE_TYPE_2D;
+                    imageCI.format = desc.vkAttachmentDescription.format;
+                    imageCI.extent.width = swapchainExtent_.width;
+                    imageCI.extent.height = swapchainExtent_.height;
+                    imageCI.extent.depth = 1;
+                    imageCI.mipLevels = 1;
+                    imageCI.arrayLayers = 1;
+                    imageCI.samples = desc.vkAttachmentDescription.samples;
+                    imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+                    imageCI.usage = desc.usage;
+                    imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+                    imageCI.initialLayout = desc.vkAttachmentDescription.initialLayout;
+
+                    VmaAllocationCreateInfo allocCI = {};
+                    allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+                    VkImage image;
+                    VmaAllocation allocation;
+                    VK_CHECKF(vmaCreateImage(allocator_, &imageCI, &allocCI, &image, &allocation, nullptr));
+                    cleanupStack_.emplace([ = ]() {
+                        vmaDestroyImage(allocator_, image, allocation);
+                    });
+
+                    VkImageAspectFlags aspectMask = 0;
+                    if (desc.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+                        aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    }
+                    if (desc.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+                        aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+                    }
+
+                    VkImageViewCreateInfo imageViewCI = {};
+                    imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                    imageViewCI.image = image;
+                    imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                    imageViewCI.format = desc.vkAttachmentDescription.format;
+                    imageViewCI.subresourceRange.aspectMask = aspectMask;
+                    imageViewCI.subresourceRange.baseMipLevel = 0;
+                    imageViewCI.subresourceRange.levelCount = 1;
+                    imageViewCI.subresourceRange.baseArrayLayer = 0;
+                    imageViewCI.subresourceRange.layerCount = 1;
+
+                    attachmentViews.emplace_back();
+                    VK_CHECKF(vkCreateImageView(device_, &imageViewCI, nullptr, &attachmentViews.back()));
+                    cleanupStack_.emplace([ = ]() {
+                        vkDestroyImageView(device_, attachmentViews.back(), nullptr);
+                    });
+                }
+            }
+
+            // loop over graphics pass attachmentViews
+
+            // if name == GraphicsPass::Swapchain
+            // attachmentViews.emplace_back(swapchainImageView);
+            // else
+            // vkCreateImageView... cleanupstack
 
             VkFramebufferCreateInfo framebufferCreateInfo = {};
             framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferCreateInfo.renderPass = render_pass;
-            framebufferCreateInfo.attachmentCount = 1;
-            framebufferCreateInfo.pAttachments = attachments;
+            framebufferCreateInfo.renderPass = renderPass;
+            framebufferCreateInfo.attachmentCount = (u32) attachmentViews.size();
+            framebufferCreateInfo.pAttachments = attachmentViews.data();
             framebufferCreateInfo.width = swapchainExtent_.width;
             framebufferCreateInfo.height = swapchainExtent_.height;
             framebufferCreateInfo.layers = 1;
@@ -496,11 +581,11 @@ Framebuffer RenderDevice::getSwapchainFramebuffer(VkRenderPass render_pass) {
                 vkDestroyFramebuffer(device_, framebuffer, nullptr);
             });
 
-            swapchainFramebuffers_[render_pass].emplace_back(Framebuffer(framebuffer, swapchainExtent_));
+            swapchainFramebuffers_[renderPass].emplace_back(Framebuffer(framebuffer, swapchainExtent_));
         }
     }
 
-    return swapchainFramebuffers_[render_pass][swapImageIndex_];
+    return swapchainFramebuffers_[renderPass][swapImageIndex_];
 }
 
 VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {

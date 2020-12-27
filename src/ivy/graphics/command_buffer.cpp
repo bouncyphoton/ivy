@@ -6,11 +6,11 @@ void CommandBuffer::bindGraphicsPipeline(VkPipeline pipeline) {
     vkCmdBindPipeline(commandBuffer_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }
 
-void CommandBuffer::executeRenderPass(VkRenderPass render_pass, Framebuffer framebuffer,
+void CommandBuffer::executeGraphicsPass(const GraphicsPass &pass, Framebuffer framebuffer,
                                       const std::function<void()> &func) {
     VkRenderPassBeginInfo renderPassBeginInfo = {};
     renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBeginInfo.renderPass = render_pass;
+    renderPassBeginInfo.renderPass = pass.getVkRenderPass();
     renderPassBeginInfo.framebuffer = framebuffer.getVkFramebuffer();
     renderPassBeginInfo.renderArea.offset = {0, 0};
     renderPassBeginInfo.renderArea.extent = framebuffer.getExtent();
@@ -22,14 +22,21 @@ void CommandBuffer::executeRenderPass(VkRenderPass render_pass, Framebuffer fram
     clearColor.color.float32[3] = 1.0f;
     clearColor.depthStencil = {0.0f, 0};
 
-    renderPassBeginInfo.clearValueCount = 1;
-    renderPassBeginInfo.pClearValues = &clearColor;
+    // Need a clear color for each attachment
+    std::vector<VkClearValue> clearColors(pass.getAttachmentDescriptions().size(), clearColor);
+
+    renderPassBeginInfo.clearValueCount = clearColors.size();
+    renderPassBeginInfo.pClearValues = clearColors.data();
 
     vkCmdBeginRenderPass(commandBuffer_, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     func();
 
     vkCmdEndRenderPass(commandBuffer_);
+}
+
+void CommandBuffer::nextSubpass() {
+    vkCmdNextSubpass(commandBuffer_, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void CommandBuffer::bindVertexBuffer(VkBuffer buffer) {
