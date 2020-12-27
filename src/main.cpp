@@ -2,7 +2,7 @@
 
 int main() {
     ivy::Engine engine;
-    engine.getOptions().appName = "Ivy Engine Demo";
+    engine.getOptions().appName = "Vulkan G-Buffer Demo | ivy engine";
     engine.getOptions().renderWidth = 800;
     engine.getOptions().renderHeight = 600;
 

@@ -5,6 +5,8 @@
 #include "ivy/options.h"
 #include "ivy/graphics/command_buffer.h"
 #include "ivy/graphics/shader.h"
+#include "ivy/graphics/vertex_description.h"
+#include "ivy/graphics/graphics_pass.h"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <vector>
@@ -19,25 +21,6 @@ struct Options;
 }
 
 namespace ivy::gfx {
-
-class VertexDescription {
-public:
-    VertexDescription(const std::vector<VkVertexInputBindingDescription> &bindings = {},
-                      const std::vector<VkVertexInputAttributeDescription> &attributes = {}) :
-        bindings_(bindings), attributes_(attributes) {}
-
-    [[nodiscard]] const std::vector<VkVertexInputBindingDescription> &getBindings() const {
-        return bindings_;
-    }
-
-    [[nodiscard]] const std::vector<VkVertexInputAttributeDescription> &getAttributes() const {
-        return attributes_;
-    }
-
-private:
-    std::vector<VkVertexInputBindingDescription> bindings_;
-    std::vector<VkVertexInputAttributeDescription> attributes_;
-};
 
 /**
  * \brief Wrapper around logical device for rendering
@@ -90,10 +73,11 @@ public:
                                   const std::vector<VkSubpassDependency> &dependencies);
 
     /**
-     * \brief Create a pipeline layout, TODO: allow descriptor sets and push constants to be defined
+     * \brief Create a pipeline layout, TODO: push constants to be defined
+     * \param bindings A vector of VkDescriptorSetLayoutBinding
      * \return VkPipelineLayout
      */
-    VkPipelineLayout createLayout();
+    VkPipelineLayout createLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings);
 
     /**
      * \brief Create a graphics pipeline
@@ -102,17 +86,18 @@ public:
      * \param layout Pipeline layout
      * \param render_pass Render pass
      * \param subpass Subpass index
+     * \param num_color_attachments The number of color attachments for the subpass
      * \return VkPipeline
      */
     VkPipeline createGraphicsPipeline(const std::vector<Shader> &shaders, const VertexDescription &vertex_description,
-                                      VkPipelineLayout layout, VkRenderPass render_pass, u32 subpass = 0);
+                                      VkPipelineLayout layout, VkRenderPass render_pass, u32 subpass, u32 num_color_attachments);
 
     /**
-     * \brief Get (or create if doesn't exist) the current swapchain framebuffer for a given render pass
-     * \param render_pass The framebuffer's render pass
-     * \return Current framebuffer
+     * \brief Get (or create if doesn't exist) the current swapchain framebuffer for a given graphics pass
+     * \param pass The graphics pass for the framebuffer to get
+     * \return Framebuffer for graphics pass (for this frame)
      */
-    Framebuffer getSwapchainFramebuffer(VkRenderPass render_pass);
+    Framebuffer getFramebuffer(const GraphicsPass &pass);
 
     /**
      * \brief Create a vertex buffer with the lifetime of the render device

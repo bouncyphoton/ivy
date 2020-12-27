@@ -14,6 +14,11 @@ namespace ivy::gfx {
 const char *vk_result_to_string(VkResult result);
 
 /**
+ * \brief Stringify a VkDescriptorType
+ */
+const char *vk_descriptor_type_to_string(VkDescriptorType type);
+
+/**
  * \brief Clamp a VkExtent2D
  */
 VkExtent2D clamp(VkExtent2D x, VkExtent2D min_ext, VkExtent2D max_ext);

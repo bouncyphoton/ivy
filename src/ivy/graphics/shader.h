@@ -1,6 +1,9 @@
 #ifndef IVY_SHADER_H
 #define IVY_SHADER_H
 
+#include <vulkan/vulkan.h>
+#include <string>
+
 namespace ivy::gfx {
 
 class Shader {
