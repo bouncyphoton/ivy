@@ -1,8 +1,10 @@
 #ifndef IVY_GRAPHICS_PASS_H
 #define IVY_GRAPHICS_PASS_H
 
+#include "ivy/types.h"
 #include "ivy/graphics/shader.h"
 #include "ivy/graphics/vertex_description.h"
+#include "ivy/graphics/descriptor_set.h"
 #include <vulkan/vulkan.h>
 #include <unordered_map>
 #include <vector>
@@ -12,10 +14,29 @@ namespace ivy::gfx {
 class RenderDevice;
 
 // TODO: this file is a little ugly/hard to read. Names of structures could be improved/re-organized
+// TODO: push constants
 
-struct AttachmentDescription {
-    VkAttachmentDescription vkAttachmentDescription;
+// <set, <binding, VkDescriptorSetLayoutBinding>>
+using LayoutBindingsMap_t = std::unordered_map<u32, std::unordered_map<u32, VkDescriptorSetLayoutBinding>>;
+
+struct AttachmentInfo {
+    VkAttachmentDescription description;
     VkImageUsageFlags usage;
+};
+
+// TODO: should this go somewhere else?
+    struct SubpassLayout {
+        VkPipelineLayout pipelineLayout;
+        std::vector<VkDescriptorSetLayout> setLayouts;
+    };
+
+// TODO: do i like this? is it confusing in build() ?
+struct Subpass {
+    Subpass(VkPipeline pipeline, const SubpassLayout &layout)
+        : pipeline(pipeline), layout(layout) {}
+
+    VkPipeline pipeline;
+    SubpassLayout layout;
 };
 
 /**
@@ -28,30 +49,36 @@ public:
      */
     inline static const char *SwapchainName = "__swapchain";
 
-    explicit GraphicsPass(VkRenderPass render_pass, const std::vector<VkPipeline> &subpass_pipelines,
-                          const std::unordered_map<std::string, AttachmentDescription> &attachment_descriptions)
-        : renderPass_(render_pass), subpassPipelines_(subpass_pipelines),
-          attachmentDescriptions_(attachment_descriptions) {}
+    explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
+                          const std::unordered_map<std::string, AttachmentInfo> &attachment_infos,
+                          const std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> &descriptorSetLayouts)
+        : renderPass_(render_pass), subpasses_(subpasses),
+          attachmentInfos_(attachment_infos), descriptorSetLayouts_(descriptorSetLayouts) {}
 
     [[nodiscard]] VkRenderPass getVkRenderPass() const {
         return renderPass_;
     }
 
-    [[nodiscard]] const std::vector<VkPipeline> &getPipelines() const {
-        return subpassPipelines_;
+    [[nodiscard]] const std::vector<Subpass> &getSubpasses() const {
+        return subpasses_;
     }
 
-    [[nodiscard]] const std::unordered_map<std::string, AttachmentDescription> &getAttachmentDescriptions() const {
-        return attachmentDescriptions_;
+    [[nodiscard]] const std::unordered_map<std::string, AttachmentInfo> &getAttachmentInfos() const {
+        return attachmentInfos_;
+    }
+
+    [[nodiscard]] const DescriptorSetLayout &getDescriptorSetLayout(u32 subpass_index, u32 set_index) const {
+        return descriptorSetLayouts_.at(subpass_index).at(set_index);
     }
 
 private:
     VkRenderPass renderPass_;
-    std::vector<VkPipeline> subpassPipelines_;
-    std::unordered_map<std::string, AttachmentDescription> attachmentDescriptions_;
+    std::vector<Subpass> subpasses_;
+    std::unordered_map<std::string, AttachmentInfo> attachmentInfos_;
+    std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
 };
 
-struct SubpassDescription {
+struct SubpassInfo {
 private:
     friend class SubpassBuilder;
     friend class GraphicsPassBuilder;
@@ -60,6 +87,8 @@ private:
     VertexDescription vertexDescription_;
     std::vector<std::string> inputAttachmentNames_;
     std::vector<std::string> colorAttachmentNames_;
+
+    LayoutBindingsMap_t descriptors_;
 };
 
 /**
@@ -72,14 +101,17 @@ public:
     SubpassBuilder &addVertexDescription(const std::vector<VkVertexInputBindingDescription> &bindings = {},
                                          const std::vector<VkVertexInputAttributeDescription> &attributes = {});
 
-    SubpassBuilder &addInputAttachment(const std::string &attachment_name);
+    SubpassBuilder &addInputAttachment(const std::string &attachment_name, u32 set, u32 binding);
 
     SubpassBuilder &addColorAttachment(const std::string &attachment_name);
 
-    SubpassDescription build();
+    SubpassBuilder &addDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags, VkDescriptorType type,
+                                  u32 count = 1);
+
+    SubpassInfo build();
 
 private:
-    SubpassDescription subpass_;
+    SubpassInfo subpass_;
 };
 
 class GraphicsPassBuilder {
@@ -97,7 +129,7 @@ public:
 
     GraphicsPassBuilder &addAttachmentSwapchain();
 
-    GraphicsPassBuilder &addSubpass(const std::string &subpass_name, const SubpassDescription &subpass);
+    GraphicsPassBuilder &addSubpass(const std::string &subpass_name, const SubpassInfo &subpass);
 
     GraphicsPassBuilder &addSubpassDependency(const std::string &src_subpass_name, const std::string &dst_subpass_name,
                                               VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
@@ -105,7 +137,7 @@ public:
 
     GraphicsPass build();
 private:
-    struct SubpassDependency {
+    struct DependencyInfo {
         std::string srcSubpass;
         std::string dstSubpass;
         VkPipelineStageFlags srcStageMask;
@@ -115,10 +147,10 @@ private:
     };
 
     RenderDevice &device_;
-    std::unordered_map<std::string, AttachmentDescription> attachments_;
-    std::unordered_map<std::string, SubpassDescription> subpassDescriptions_;
+    std::unordered_map<std::string, AttachmentInfo> attachments_;
+    std::unordered_map<std::string, SubpassInfo> subpassInfos_;
     std::vector<std::string> subpassOrder_;
-    std::vector<SubpassDependency> subpassDependencies_;
+    std::vector<DependencyInfo> subpassDependencyInfo_;
 };
 
 }

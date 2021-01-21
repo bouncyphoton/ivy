@@ -198,6 +198,27 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
             vkDestroySemaphore(device_, imageAvailableSemaphores_[i], nullptr);
         });
     }
+
+    //----------------------------------
+    // Create descriptor pool
+    //----------------------------------
+
+    // TODO: one pool for frame? so you can reset pools on a per-frame basis?
+
+    std::vector<VkDescriptorPoolSize> poolSizes;
+    poolSizes.emplace_back(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100});
+
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
+    descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    descriptorPoolCreateInfo.maxSets = 100; // TODO ?
+    descriptorPoolCreateInfo.poolSizeCount = (u32) poolSizes.size();
+    descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
+
+    VK_CHECKF(vkCreateDescriptorPool(device_, &descriptorPoolCreateInfo, nullptr, &pool_));
+    cleanupStack_.emplace([ = ]() {
+        vkDestroyDescriptorPool(device_, pool_, nullptr);
+    });
+
 }
 
 RenderDevice::~RenderDevice() {
@@ -336,26 +357,37 @@ VkRenderPass RenderDevice::createRenderPass(const std::vector<VkAttachmentDescri
     return renderPass;
 }
 
-VkPipelineLayout RenderDevice::createLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings = {}) {
-    // Create descriptor set layouts
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI = {};
-    descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorSetLayoutCI.bindingCount = (u32) bindings.size();
-    descriptorSetLayoutCI.pBindings = bindings.data();
+SubpassLayout RenderDevice::createLayout(const LayoutBindingsMap_t &layout_bindings) {
+    // Create descriptor sets layouts
+    std::vector<VkDescriptorSetLayout> setLayouts;
+    for (const auto &setsPair : layout_bindings) {
+        // Convert unordered map of bindings to vector
+        std::vector<VkDescriptorSetLayoutBinding> bindings;
+        bindings.reserve(setsPair.second.size());
+        for (const auto &binding : setsPair.second) {
+            bindings.emplace_back(binding.second);
+        }
 
-    VkDescriptorSetLayout setLayout;
-    VK_CHECKF(vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr, &setLayout));
-    cleanupStack_.emplace([ = ]() {
-        vkDestroyDescriptorSetLayout(device_, setLayout, nullptr);
-    });
+        // Create descriptor set layout
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI = {};
+        descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        descriptorSetLayoutCI.bindingCount = (u32) bindings.size();
+        descriptorSetLayoutCI.pBindings = bindings.data();
+
+        setLayouts.emplace_back();
+        VK_CHECKF(vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr, &setLayouts.back()));
+        cleanupStack_.emplace([ = ]() {
+            vkDestroyDescriptorSetLayout(device_, setLayouts.back(), nullptr);
+        });
+    }
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo layoutCI = {};
     layoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layoutCI.pNext = nullptr;
     layoutCI.flags = 0;
-    layoutCI.setLayoutCount = 1;
-    layoutCI.pSetLayouts = &setLayout;
+    layoutCI.setLayoutCount = (u32) setLayouts.size();
+    layoutCI.pSetLayouts = setLayouts.data();
     layoutCI.pushConstantRangeCount = 0;
     layoutCI.pPushConstantRanges = nullptr;
 
@@ -365,7 +397,7 @@ VkPipelineLayout RenderDevice::createLayout(const std::vector<VkDescriptorSetLay
         vkDestroyPipelineLayout(device_, layout, nullptr);
     });
 
-    return layout;
+    return SubpassLayout{layout, setLayouts};
 }
 
 VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shaders,
@@ -489,20 +521,26 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     return graphicsPipeline;
 }
 
-Framebuffer RenderDevice::getFramebuffer(const GraphicsPass &pass) {
+Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
     VkRenderPass renderPass = pass.getVkRenderPass();
 
     // Create framebuffers if they don't exist
-    if (swapchainFramebuffers_[renderPass].size() != swapchainImageViews_.size()) {
-        for (VkImageView &swapchainImageView : swapchainImageViews_) {
-            const std::unordered_map<std::string, AttachmentDescription> &descriptions = pass.getAttachmentDescriptions();
-            std::vector<VkImageView> attachmentViews;
+    if (framebuffers_[renderPass].size() != swapchainImageViews_.size()) {
+        const std::unordered_map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
 
-            for (const auto &attachment : descriptions) {
-                if (attachment.first == GraphicsPass::SwapchainName) {
-                    attachmentViews.emplace_back(swapchainImageView);
+        // Per in-flight frame
+        for (VkImageView &swapchainImageView : swapchainImageViews_) {
+            // TODO: redundant ?
+            std::unordered_map<std::string, VkImageView> attachmentViews;
+            std::vector<VkImageView> viewsVector;
+
+            // Get/create image view for each attachment in graphics pass
+            for (const auto &infoPair : attachmentInfos) {
+                if (infoPair.first == GraphicsPass::SwapchainName) {
+                    attachmentViews[infoPair.first] = swapchainImageView;
+                    viewsVector.emplace_back(swapchainImageView);
                 } else {
-                    const AttachmentDescription &desc = attachment.second;
+                    const AttachmentInfo &desc = infoPair.second;
 
                     // TODO: support non-2D attachments (imageCI.imageType, imageCI.extent, imageViewCI.viewType) ?
                     // TODO: support non-swapchain-sized attachments ?
@@ -510,17 +548,17 @@ Framebuffer RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                     VkImageCreateInfo imageCI = {};
                     imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
                     imageCI.imageType = VK_IMAGE_TYPE_2D;
-                    imageCI.format = desc.vkAttachmentDescription.format;
+                    imageCI.format = desc.description.format;
                     imageCI.extent.width = swapchainExtent_.width;
                     imageCI.extent.height = swapchainExtent_.height;
                     imageCI.extent.depth = 1;
                     imageCI.mipLevels = 1;
                     imageCI.arrayLayers = 1;
-                    imageCI.samples = desc.vkAttachmentDescription.samples;
+                    imageCI.samples = desc.description.samples;
                     imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
                     imageCI.usage = desc.usage;
                     imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-                    imageCI.initialLayout = desc.vkAttachmentDescription.initialLayout;
+                    imageCI.initialLayout = desc.description.initialLayout;
 
                     VmaAllocationCreateInfo allocCI = {};
                     allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -544,33 +582,30 @@ Framebuffer RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                     imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
                     imageViewCI.image = image;
                     imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-                    imageViewCI.format = desc.vkAttachmentDescription.format;
+                    imageViewCI.format = desc.description.format;
                     imageViewCI.subresourceRange.aspectMask = aspectMask;
                     imageViewCI.subresourceRange.baseMipLevel = 0;
                     imageViewCI.subresourceRange.levelCount = 1;
                     imageViewCI.subresourceRange.baseArrayLayer = 0;
                     imageViewCI.subresourceRange.layerCount = 1;
 
-                    attachmentViews.emplace_back();
-                    VK_CHECKF(vkCreateImageView(device_, &imageViewCI, nullptr, &attachmentViews.back()));
+                    VkImageView view;
+                    VK_CHECKF(vkCreateImageView(device_, &imageViewCI, nullptr, &view));
                     cleanupStack_.emplace([ = ]() {
-                        vkDestroyImageView(device_, attachmentViews.back(), nullptr);
+                        vkDestroyImageView(device_, view, nullptr);
                     });
+
+                    attachmentViews[infoPair.first] = view;
+                    viewsVector.emplace_back(view);
                 }
             }
 
-            // loop over graphics pass attachmentViews
-
-            // if name == GraphicsPass::Swapchain
-            // attachmentViews.emplace_back(swapchainImageView);
-            // else
-            // vkCreateImageView... cleanupstack
-
+            // Create the framebuffer for this frame and render pass
             VkFramebufferCreateInfo framebufferCreateInfo = {};
             framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferCreateInfo.renderPass = renderPass;
-            framebufferCreateInfo.attachmentCount = (u32) attachmentViews.size();
-            framebufferCreateInfo.pAttachments = attachmentViews.data();
+            framebufferCreateInfo.attachmentCount = (u32) viewsVector.size();
+            framebufferCreateInfo.pAttachments = viewsVector.data();
             framebufferCreateInfo.width = swapchainExtent_.width;
             framebufferCreateInfo.height = swapchainExtent_.height;
             framebufferCreateInfo.layers = 1;
@@ -581,11 +616,11 @@ Framebuffer RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                 vkDestroyFramebuffer(device_, framebuffer, nullptr);
             });
 
-            swapchainFramebuffers_[renderPass].emplace_back(Framebuffer(framebuffer, swapchainExtent_));
+            framebuffers_[renderPass].emplace_back(Framebuffer(framebuffer, swapchainExtent_, attachmentViews));
         }
     }
 
-    return swapchainFramebuffers_[renderPass][swapImageIndex_];
+    return framebuffers_[renderPass][swapImageIndex_];
 }
 
 VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
@@ -651,6 +686,71 @@ VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
     }
 
     return vertexBuffer;
+}
+
+VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set) {
+    VkDescriptorSet dstSet;
+    Framebuffer &framebuffer = getFramebuffer(pass);
+
+    // TODO: descriptor set caching
+    // Try to see if exact descriptor set for this frame already exists
+    if (false) {
+        // ...
+
+        return dstSet;
+    }
+
+    // TODO: mark descriptor sets as available or used
+    // Otherwise see if there are any unused, already allocated descriptor sets
+    if (false) {
+        // ...
+    } else {
+        // Need to allocate a new descriptor set
+        // TODO: ugly but works
+        VkDescriptorSetLayout layout = pass.getSubpasses().at(set.getSubpassIndex()).layout.setLayouts.at(set.getSetIndex());
+
+        // NOTE: right now, new descriptor sets are allocated every frame - you will run out after a few seconds and crash c:
+
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = pool_;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &layout;
+
+        VK_CHECKF(vkAllocateDescriptorSets(device_, &allocInfo, &dstSet));
+        // TODO: if can't allocate new descriptor set
+    }
+
+    // Generate writes
+    std::vector<VkWriteDescriptorSet> writes;
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    imageInfos.reserve(set.getInputAttachmentInfos().size());
+    // TODO: triple check we're not reading/writing to invalid memory
+
+    // Input attachments
+    for (const InputAttachmentDescriptorInfo &desc : set.getInputAttachmentInfos()) {
+        VkDescriptorImageInfo imageInfo = {};
+        imageInfo.sampler = VK_NULL_HANDLE;
+        imageInfo.imageView = framebuffer.getViews().at(desc.attachmentName);
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfos.emplace_back(imageInfo);
+
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = dstSet;
+        write.dstBinding = desc.binding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+        write.pImageInfo = &imageInfos.back();
+        writes.emplace_back(write);
+    }
+
+    // TODO: buffer
+
+    // Write to descriptor set
+    vkUpdateDescriptorSets(device_, writes.size(), writes.data(), 0, nullptr);
+
+    return dstSet;
 }
 
 void RenderDevice::choosePhysicalDevice() {

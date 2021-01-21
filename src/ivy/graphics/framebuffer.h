@@ -3,6 +3,8 @@
 
 #include "ivy/types.h"
 #include <vulkan/vulkan.h>
+#include <string>
+#include <unordered_map>
 
 namespace ivy::gfx {
 
@@ -11,8 +13,8 @@ namespace ivy::gfx {
  */
 class Framebuffer {
 public:
-    Framebuffer(VkFramebuffer framebuffer, VkExtent2D extent)
-        : framebuffer_(framebuffer), extent_(extent) {}
+    Framebuffer(VkFramebuffer framebuffer, VkExtent2D extent, const std::unordered_map<std::string, VkImageView> &views)
+        : framebuffer_(framebuffer), extent_(extent), views_(views) {}
 
     [[nodiscard]] VkFramebuffer getVkFramebuffer() const {
         return framebuffer_;
@@ -22,9 +24,14 @@ public:
         return extent_;
     }
 
+    [[nodiscard]] const std::unordered_map<std::string, VkImageView> &getViews() const {
+        return views_;
+    }
+
 private:
     VkFramebuffer framebuffer_;
     VkExtent2D extent_;
+    std::unordered_map<std::string, VkImageView> views_;
 };
 
 }

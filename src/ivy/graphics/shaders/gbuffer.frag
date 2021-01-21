@@ -1,6 +1,6 @@
 #version 450
 
-layout(location = 0) in VertexData {
+layout (location = 0) in VertexData {
     vec3 color;
     vec3 worldPos;
 } FS_IN;

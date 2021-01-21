@@ -5,7 +5,6 @@
 namespace ivy {
 
 // TODO: depth buffering
-// TODO: ubo
 // TODO: multiple render passes
 
 // TODO: remove temp vertices
@@ -38,8 +37,8 @@ Renderer::Renderer(const Options &options, const Platform &platform)
                     gfx::SubpassBuilder()
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/lighting.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/lighting.frag.spv")
-                    .addInputAttachment("albedo")
-                    .addInputAttachment("position")
+                    .addInputAttachment("albedo", 0, 0)
+                    .addInputAttachment("position", 0, 1)
                     .addColorAttachment(gfx::GraphicsPass::SwapchainName)
                     .build()
                    )
@@ -61,26 +60,35 @@ Renderer::~Renderer() {
 void Renderer::render() {
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
-
     gfx::GraphicsPass pass = passes_.front();
 
-    cmd.executeGraphicsPass(pass, device_.getFramebuffer(pass), [&]() {
-        // TODO: allocate descriptor sets and bind
+    cmd.executeGraphicsPass(device_, pass, [&]() {
+        u32 subpassIdx = 0;
 
-        // Subpass 0
-        cmd.bindGraphicsPipeline(pass.getPipelines()[0]);
-        cmd.bindVertexBuffer(vertexBuffer_);
-        cmd.draw(COUNTOF(vertices), 1, 0, 0);
+        // Subpass 0, g-buffer
+        {
+            cmd.bindGraphicsPipeline(pass, subpassIdx);
+            cmd.bindVertexBuffer(vertexBuffer_);
+            cmd.draw(COUNTOF(vertices), 1, 0, 0);
+        }
 
-        // Subpass 1
-        cmd.nextSubpass();
-        cmd.bindGraphicsPipeline(pass.getPipelines()[1]);
-        cmd.draw(3, 1, 0, 0); // Fullscreen triangle
+        // Subpass 1, lighting
+        {
+            ++subpassIdx;
+            cmd.nextSubpass();
+
+            cmd.bindGraphicsPipeline(pass, subpassIdx);
+
+            gfx::DescriptorSet inputAttachmentsSet(pass.getDescriptorSetLayout(subpassIdx, 0));
+            inputAttachmentsSet.setInputAttachment(0, "albedo");
+            inputAttachmentsSet.setInputAttachment(1, "position");
+            cmd.setDescriptorSet(device_, pass, inputAttachmentsSet);
+
+            cmd.draw(3, 1, 0, 0); // Fullscreen triangle
+        }
     });
 
     device_.endFrame();
-
-    Log::fatal("DEBUG END OF FRAME");
 }
 
 }
