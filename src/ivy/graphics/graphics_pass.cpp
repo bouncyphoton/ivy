@@ -6,17 +6,20 @@
 namespace ivy::gfx {
 
 GraphicsPass GraphicsPassBuilder::build() {
-    // TODO: input validation/error checking
+    // TODO: input validation/error checking, swapchain attachments etc.
 
     Log::debug("Building graphics pass");
 
-    // Create attachments
-    std::vector<VkAttachmentDescription> attachments;
+    // Create attachmentDescriptions
+    std::vector<VkAttachmentDescription> attachmentDescriptions;
     std::unordered_map<std::string, u32> attachmentLocations;
-    for (const auto &attachment_pair : attachments_) {
-        Log::debug("- Processing attachment: %s", attachment_pair.first.c_str());
-        attachmentLocations[attachment_pair.first] = attachments.size();
-        attachments.emplace_back(attachment_pair.second.vkAttachmentDescription);
+    for (const auto &attachmentPair : attachments_) {
+        const std::string &name = attachmentPair.first;
+        const AttachmentInfo &info = attachmentPair.second;
+        Log::debug("- Processing attachment: %s", name.c_str());
+
+        attachmentLocations[name] = attachmentDescriptions.size();
+        attachmentDescriptions.emplace_back(info.description);
     }
 
     // Create subpasses
@@ -24,12 +27,12 @@ GraphicsPass GraphicsPassBuilder::build() {
     std::unordered_map<std::string, u32> subpassLocations;
     std::unordered_map<std::string, std::vector<VkAttachmentReference>> colorAttachmentReferences;
     std::unordered_map<std::string, std::vector<VkAttachmentReference>> inputAttachmentReferences;
-    for (const std::string &subpass_name : subpassOrder_) {
-        Log::debug("- Processing subpass: %s", subpass_name.c_str());
-        subpassLocations[subpass_name] = subpasses.size();
+    for (const std::string &subpassName : subpassOrder_) {
+        Log::debug("- Processing subpass: %s", subpassName.c_str());
+        subpassLocations[subpassName] = subpasses.size();
 
         // Create attachment references
-        for (const std::string &inputAttachmentName : subpassDescriptions_[subpass_name].inputAttachmentNames_) {
+        for (const std::string &inputAttachmentName : subpassInfos_[subpassName].inputAttachmentNames_) {
             Log::debug("  - Processing input attachment: %s", inputAttachmentName.c_str());
             VkAttachmentReference reference = {};
             reference.attachment = attachmentLocations[inputAttachmentName];
@@ -38,9 +41,9 @@ GraphicsPass GraphicsPassBuilder::build() {
             // Keep track that this attachment was used as an input attachment
             attachments_[inputAttachmentName].usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 
-            inputAttachmentReferences[subpass_name].emplace_back(reference);
+            inputAttachmentReferences[subpassName].emplace_back(reference);
         }
-        for (const std::string &colorAttachmentName : subpassDescriptions_[subpass_name].colorAttachmentNames_) {
+        for (const std::string &colorAttachmentName : subpassInfos_[subpassName].colorAttachmentNames_) {
             Log::debug("  - Processing color attachment: %s", colorAttachmentName.c_str());
             VkAttachmentReference reference = {};
             reference.attachment = attachmentLocations[colorAttachmentName];
@@ -49,17 +52,17 @@ GraphicsPass GraphicsPassBuilder::build() {
             // Keep track that this attachment was used as a color attachment
             attachments_[colorAttachmentName].usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-            colorAttachmentReferences[subpass_name].emplace_back(reference);
+            colorAttachmentReferences[subpassName].emplace_back(reference);
         }
 
         // Create the subpass description
         VkSubpassDescription subpassDescription = {};
         subpassDescription.flags = 0;
         subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpassDescription.inputAttachmentCount = (u32) inputAttachmentReferences[subpass_name].size();
-        subpassDescription.pInputAttachments = inputAttachmentReferences[subpass_name].data();
-        subpassDescription.colorAttachmentCount = (u32) colorAttachmentReferences[subpass_name].size();
-        subpassDescription.pColorAttachments = colorAttachmentReferences[subpass_name].data();
+        subpassDescription.inputAttachmentCount = (u32) inputAttachmentReferences[subpassName].size();
+        subpassDescription.pInputAttachments = inputAttachmentReferences[subpassName].data();
+        subpassDescription.colorAttachmentCount = (u32) colorAttachmentReferences[subpassName].size();
+        subpassDescription.pColorAttachments = colorAttachmentReferences[subpassName].data();
         subpassDescription.pResolveAttachments = nullptr;
         subpassDescription.pDepthStencilAttachment = nullptr;
         subpassDescription.preserveAttachmentCount = 0;
@@ -73,56 +76,63 @@ GraphicsPass GraphicsPassBuilder::build() {
 
     // Create dependencies
     std::vector<VkSubpassDependency> dependencies = {};
-    for (const SubpassDependency &dependencyInfo : subpassDependencies_) {
-        Log::debug("  - Processing dependency: %s -> %s", dependencyInfo.srcSubpass.c_str(), dependencyInfo.dstSubpass.c_str());
+    for (const DependencyInfo &info : subpassDependencyInfo_) {
+        Log::debug("  - Processing dependency: %s -> %s", info.srcSubpass.c_str(), info.dstSubpass.c_str());
         VkSubpassDependency dependency = {};
-        dependency.srcSubpass = subpassLocations[dependencyInfo.srcSubpass];
-        dependency.dstSubpass = subpassLocations[dependencyInfo.dstSubpass];
-        dependency.srcStageMask = dependencyInfo.srcStageMask;
-        dependency.dstStageMask = dependencyInfo.dstStageMask;
-        dependency.srcAccessMask = dependencyInfo.srcAccessFlags;
-        dependency.dstAccessMask = dependencyInfo.dstAccessFlags;
+        dependency.srcSubpass = subpassLocations[info.srcSubpass];
+        dependency.dstSubpass = subpassLocations[info.dstSubpass];
+        dependency.srcStageMask = info.srcStageMask;
+        dependency.dstStageMask = info.dstStageMask;
+        dependency.srcAccessMask = info.srcAccessFlags;
+        dependency.dstAccessMask = info.dstAccessFlags;
 
         dependencies.emplace_back(dependency);
     }
 
     // Create render pass
-    VkRenderPass renderPass = device_.createRenderPass(attachments, subpasses, dependencies);
+    VkRenderPass renderPass = device_.createRenderPass(attachmentDescriptions, subpasses, dependencies);
 
     Log::debug("- Building pipelines");
 
-    // Create graphics pipelines
-    std::vector<VkPipeline> subpassPipelines;
-    for (const std::string &subpass_name : subpassOrder_) {
-        const SubpassDescription &desc = subpassDescriptions_[subpass_name];
+    // Create subpass pipelines and descriptor set layouts
+    std::vector<Subpass> subpassPipelines;
+    std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> descriptorSetLayouts;
+    for (u32 subpassIdx = 0; subpassIdx < subpassOrder_.size(); ++subpassIdx) {
+        const std::string &subpass_name = subpassOrder_[subpassIdx];
+        const SubpassInfo &subpassInfo = subpassInfos_[subpass_name];
 
-        // Create descriptor sets and pipeline layout
-        std::vector<VkDescriptorSetLayoutBinding> bindings;
-        for (u32 i = 0; i < desc.inputAttachmentNames_.size(); ++i) {
-            bindings.emplace_back();
-            bindings.back().binding = i;
-            bindings.back().descriptorCount = 1;
-            bindings.back().descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-            bindings.back().stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        // Descriptor set layout storing
+        Log::debug("  - Subpass %s has %d set%s", subpass_name.c_str(), subpassInfo.descriptors_.size(),
+                   subpassInfo.descriptors_.size() != 1 ? "s" : "");
+        for (const auto &descriptorSet : subpassInfo.descriptors_) {
+            u32 setIdx = descriptorSet.first;
+            const std::unordered_map<u32, VkDescriptorSetLayoutBinding> &bindings = descriptorSet.second;
+            Log::debug("    - set %d has %d bindings", setIdx, bindings.size());
+
+            std::vector<VkDescriptorSetLayoutBinding> bindingsVector;
+            for (const auto &binding : bindings) {
+                Log::debug("      - binding %d: %s", binding.first, vk_descriptor_type_to_string(binding.second.descriptorType));
+                bindingsVector.emplace_back(binding.second);
+            }
+
+            // Store descriptor set layout
+            descriptorSetLayouts[subpassIdx].emplace(setIdx, DescriptorSetLayout(subpassIdx, setIdx, bindingsVector));
         }
 
-        // Debug logging
-        Log::debug("  - Subpass %s has %d bindings", subpass_name.c_str(), bindings.size());
-        for (u32 i = 0; i < bindings.size(); ++i) {
-            Log::debug("    - binding %d: %s", i, vk_descriptor_type_to_string(bindings[i].descriptorType));
-        }
+        // Create layout
+        SubpassLayout layout = device_.createLayout(subpassInfo.descriptors_);
 
-        VkPipelineLayout layout = device_.createLayout(bindings);
-
+        // Create pipeline
         subpassPipelines.emplace_back(
             device_.createGraphicsPipeline(
-                desc.shaders_, desc.vertexDescription_, layout, renderPass, subpassPipelines.size(),
-                desc.colorAttachmentNames_.size()
-            )
+                subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass, subpassPipelines.size(),
+                subpassInfo.colorAttachmentNames_.size()
+            ),
+            layout
         );
     }
 
-    return GraphicsPass(renderPass, subpassPipelines, attachments_);
+    return GraphicsPass(renderPass, subpassPipelines, attachments_, descriptorSetLayouts);
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,
@@ -139,7 +149,7 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attac
     attachment.initialLayout = initial_layout;
     attachment.finalLayout = final_layout;
 
-    attachments_[attachment_name].vkAttachmentDescription = attachment;
+    attachments_[attachment_name].description = attachment;
     return *this;
 }
 
@@ -151,8 +161,8 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachmentSwapchain() {
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addSubpass(const std::string &subpass_name,
-                                                     const SubpassDescription &subpass) {
-    subpassDescriptions_[subpass_name] = subpass;
+                                                     const SubpassInfo &subpass) {
+    subpassInfos_[subpass_name] = subpass;
     subpassOrder_.emplace_back(subpass_name);
     return *this;
 }
@@ -161,7 +171,7 @@ GraphicsPassBuilder &GraphicsPassBuilder::addSubpassDependency(const std::string
                                                                const std::string &dst_subpass_name,
                                                                VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
                                                                VkAccessFlags src_access_flags, VkAccessFlags dst_access_flags) {
-    SubpassDependency dependency = {};
+    DependencyInfo dependency = {};
     dependency.srcSubpass = src_subpass_name;
     dependency.dstSubpass = dst_subpass_name;
     dependency.srcStageMask = src_stage_mask;
@@ -169,7 +179,7 @@ GraphicsPassBuilder &GraphicsPassBuilder::addSubpassDependency(const std::string
     dependency.srcAccessFlags = src_access_flags;
     dependency.dstAccessFlags = dst_access_flags;
 
-    subpassDependencies_.emplace_back(dependency);
+    subpassDependencyInfo_.emplace_back(dependency);
     return *this;
 }
 
@@ -185,8 +195,9 @@ SubpassBuilder &SubpassBuilder::addVertexDescription(const std::vector<VkVertexI
     return *this;
 }
 
-SubpassBuilder &SubpassBuilder::addInputAttachment(const std::string &attachment_name) {
+SubpassBuilder &SubpassBuilder::addInputAttachment(const std::string &attachment_name, u32 set, u32 binding) {
     subpass_.inputAttachmentNames_.emplace_back(attachment_name);
+    addDescriptor(set, binding, VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
     return *this;
 }
 
@@ -195,8 +206,20 @@ SubpassBuilder &SubpassBuilder::addColorAttachment(const std::string &attachment
     return *this;
 }
 
-SubpassDescription SubpassBuilder::build() {
+SubpassInfo SubpassBuilder::build() {
     return subpass_;
+}
+
+SubpassBuilder &SubpassBuilder::addDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags,
+                                              VkDescriptorType type, u32 count) {
+    VkDescriptorSetLayoutBinding layoutBinding = {};
+    layoutBinding.binding = binding;
+    layoutBinding.descriptorType = type;
+    layoutBinding.descriptorCount = count;
+    layoutBinding.stageFlags = stage_flags;
+
+    subpass_.descriptors_[set][binding] = layoutBinding;
+    return *this;
 }
 
 }

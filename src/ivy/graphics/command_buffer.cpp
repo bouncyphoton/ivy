@@ -1,4 +1,5 @@
 #include "command_buffer.h"
+#include "render_device.h"
 
 namespace ivy::gfx {
 
@@ -6,8 +7,13 @@ void CommandBuffer::bindGraphicsPipeline(VkPipeline pipeline) {
     vkCmdBindPipeline(commandBuffer_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }
 
-void CommandBuffer::executeGraphicsPass(const GraphicsPass &pass, Framebuffer framebuffer,
-                                      const std::function<void()> &func) {
+void CommandBuffer::bindGraphicsPipeline(const GraphicsPass &pass, u32 subpass) {
+    bindGraphicsPipeline(pass.getSubpasses()[subpass].pipeline);
+}
+
+void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass &pass, const std::function<void()> &func) {
+    Framebuffer &framebuffer = device.getFramebuffer(pass);
+
     VkRenderPassBeginInfo renderPassBeginInfo = {};
     renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassBeginInfo.renderPass = pass.getVkRenderPass();
@@ -23,7 +29,7 @@ void CommandBuffer::executeGraphicsPass(const GraphicsPass &pass, Framebuffer fr
     clearColor.depthStencil = {0.0f, 0};
 
     // Need a clear color for each attachment
-    std::vector<VkClearValue> clearColors(pass.getAttachmentDescriptions().size(), clearColor);
+    std::vector<VkClearValue> clearColors(pass.getAttachmentInfos().size(), clearColor);
 
     renderPassBeginInfo.clearValueCount = clearColors.size();
     renderPassBeginInfo.pClearValues = clearColors.data();
@@ -37,6 +43,17 @@ void CommandBuffer::executeGraphicsPass(const GraphicsPass &pass, Framebuffer fr
 
 void CommandBuffer::nextSubpass() {
     vkCmdNextSubpass(commandBuffer_, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void CommandBuffer::setDescriptorSet(RenderDevice &device, const GraphicsPass &pass, const DescriptorSet &set) {
+    // TODO: turn off descriptor set validation check for release builds
+    set.validate();
+
+    VkDescriptorSet vkSet = device.getVkDescriptorSet(pass, set);
+
+    vkCmdBindDescriptorSets(commandBuffer_, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pass.getSubpasses()[set.getSubpassIndex()].layout.pipelineLayout, set.getSetIndex(),
+                            1, &vkSet, 0, nullptr);
 }
 
 void CommandBuffer::bindVertexBuffer(VkBuffer buffer) {

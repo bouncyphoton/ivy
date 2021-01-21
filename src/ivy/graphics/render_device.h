@@ -73,11 +73,12 @@ public:
                                   const std::vector<VkSubpassDependency> &dependencies);
 
     /**
-     * \brief Create a pipeline layout, TODO: push constants to be defined
-     * \param bindings A vector of VkDescriptorSetLayoutBinding
-     * \return VkPipelineLayout
+     * \brief Create a layout for a subpass
+     * \param layout_bindings An unordered map of unordered maps of VkDescriptorSetLayoutBinding.
+     * The keys are set and binding respectively.
+     * \return SubpassLayout
      */
-    VkPipelineLayout createLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings);
+    SubpassLayout createLayout(const LayoutBindingsMap_t &layout_bindings = {});
 
     /**
      * \brief Create a graphics pipeline
@@ -97,7 +98,7 @@ public:
      * \param pass The graphics pass for the framebuffer to get
      * \return Framebuffer for graphics pass (for this frame)
      */
-    Framebuffer getFramebuffer(const GraphicsPass &pass);
+    Framebuffer &getFramebuffer(const GraphicsPass &pass);
 
     /**
      * \brief Create a vertex buffer with the lifetime of the render device
@@ -106,6 +107,14 @@ public:
      * \return VkBuffer
      */
     VkBuffer createVertexBuffer(void *data, VkDeviceSize size);
+
+    /**
+     * \brief Get a VkDescriptorSet with data specified in set for a graphics pass for the current frame
+     * \param pass The associated graphics pass
+     * \param set The set
+     * \return VkDescriptorSet ready for binding
+     */
+    VkDescriptorSet getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set);
 
 private:
     /**
@@ -142,7 +151,7 @@ private:
     VkFormat swapchainFormat_;
     std::vector<VkImage> swapchainImages_;
     std::vector<VkImageView> swapchainImageViews_;
-    std::unordered_map<VkRenderPass, std::vector<Framebuffer>> swapchainFramebuffers_;
+    std::unordered_map<VkRenderPass, std::vector<Framebuffer>> framebuffers_;
 
     VkCommandPool commandPool_;
     std::vector<VkCommandBuffer> commandBuffers_;
@@ -152,6 +161,8 @@ private:
     std::vector<VkSemaphore> imageAvailableSemaphores_;
     std::vector<VkSemaphore> renderFinishedSemaphores_;
     std::vector<VkFence> inFlightFences_;
+
+    VkDescriptorPool pool_ = VK_NULL_HANDLE;
 };
 
 }

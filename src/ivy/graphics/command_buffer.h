@@ -4,6 +4,7 @@
 #include "ivy/types.h"
 #include "ivy/graphics/framebuffer.h"
 #include "ivy/graphics/graphics_pass.h"
+#include "ivy/graphics/descriptor_set.h"
 #include <vulkan/vulkan.h>
 #include <functional>
 
@@ -19,9 +20,13 @@ public:
 
     void bindGraphicsPipeline(VkPipeline pipeline);
 
-    void executeGraphicsPass(const GraphicsPass &pass, Framebuffer framebuffer, const std::function<void()> &func);
+    void bindGraphicsPipeline(const GraphicsPass &pass, u32 subpass);
+
+    void executeGraphicsPass(RenderDevice &device, const GraphicsPass &pass, const std::function<void()> &func);
 
     void nextSubpass();
+
+    void setDescriptorSet(RenderDevice &device, const GraphicsPass &pass, const DescriptorSet &set);
 
     void bindVertexBuffer(VkBuffer buffer);
 
