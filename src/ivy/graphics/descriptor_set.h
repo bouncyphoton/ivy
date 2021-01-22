@@ -9,6 +9,8 @@
 
 namespace ivy::gfx {
 
+class GraphicsPass;
+
 struct DescriptorSetLayout {
     DescriptorSetLayout(u32 subpass_index, u32 set_index, const std::vector<VkDescriptorSetLayoutBinding> &bindings)
         : subpassIndex(subpass_index), setIndex(set_index), bindings(bindings) {}
@@ -33,8 +35,7 @@ struct InputAttachmentDescriptorInfo {
  */
 class DescriptorSet {
 public:
-    DescriptorSet(const DescriptorSetLayout &layout)
-        : layout_(layout) {}
+    DescriptorSet(const GraphicsPass &pass, u32 subpass_index, u32 set_index);
 
     void setInputAttachment(u32 binding, const std::string &attachment_name);
 
@@ -53,6 +54,7 @@ public:
     }
 
 private:
+    std::string subpassName_;
     DescriptorSetLayout layout_;
     std::vector<InputAttachmentDescriptorInfo> inputAttachmentInfos_;
 };

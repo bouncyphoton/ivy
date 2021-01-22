@@ -25,18 +25,19 @@ struct AttachmentInfo {
 };
 
 // TODO: should this go somewhere else?
-    struct SubpassLayout {
-        VkPipelineLayout pipelineLayout;
-        std::vector<VkDescriptorSetLayout> setLayouts;
-    };
+struct SubpassLayout {
+    VkPipelineLayout pipelineLayout;
+    std::vector<VkDescriptorSetLayout> setLayouts;
+};
 
 // TODO: do i like this? is it confusing in build() ?
 struct Subpass {
-    Subpass(VkPipeline pipeline, const SubpassLayout &layout)
-        : pipeline(pipeline), layout(layout) {}
+    Subpass(VkPipeline pipeline, const SubpassLayout &layout, const std::string &name)
+        : pipeline(pipeline), layout(layout), name(name) {}
 
     VkPipeline pipeline;
     SubpassLayout layout;
+    std::string name;
 };
 
 /**
