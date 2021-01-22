@@ -79,7 +79,7 @@ void Renderer::render() {
 
             cmd.bindGraphicsPipeline(pass, subpassIdx);
 
-            gfx::DescriptorSet inputAttachmentsSet(pass.getDescriptorSetLayout(subpassIdx, 0));
+            gfx::DescriptorSet inputAttachmentsSet(pass, subpassIdx, 0);
             inputAttachmentsSet.setInputAttachment(0, "albedo");
             inputAttachmentsSet.setInputAttachment(1, "position");
             cmd.setDescriptorSet(device_, pass, inputAttachmentsSet);

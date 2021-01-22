@@ -23,13 +23,13 @@ GraphicsPass GraphicsPassBuilder::build() {
     }
 
     // Create subpasses
-    std::vector<VkSubpassDescription> subpasses;
+    std::vector<VkSubpassDescription> subpassDescriptions;
     std::unordered_map<std::string, u32> subpassLocations;
     std::unordered_map<std::string, std::vector<VkAttachmentReference>> colorAttachmentReferences;
     std::unordered_map<std::string, std::vector<VkAttachmentReference>> inputAttachmentReferences;
     for (const std::string &subpassName : subpassOrder_) {
         Log::debug("- Processing subpass: %s", subpassName.c_str());
-        subpassLocations[subpassName] = subpasses.size();
+        subpassLocations[subpassName] = subpassDescriptions.size();
 
         // Create attachment references
         for (const std::string &inputAttachmentName : subpassInfos_[subpassName].inputAttachmentNames_) {
@@ -68,7 +68,7 @@ GraphicsPass GraphicsPassBuilder::build() {
         subpassDescription.preserveAttachmentCount = 0;
         subpassDescription.pPreserveAttachments = nullptr;
 
-        subpasses.emplace_back(subpassDescription);
+        subpassDescriptions.emplace_back(subpassDescription);
     }
     subpassLocations[GraphicsPass::SwapchainName] = VK_SUBPASS_EXTERNAL;
 
@@ -90,12 +90,12 @@ GraphicsPass GraphicsPassBuilder::build() {
     }
 
     // Create render pass
-    VkRenderPass renderPass = device_.createRenderPass(attachmentDescriptions, subpasses, dependencies);
+    VkRenderPass renderPass = device_.createRenderPass(attachmentDescriptions, subpassDescriptions, dependencies);
 
     Log::debug("- Building pipelines");
 
     // Create subpass pipelines and descriptor set layouts
-    std::vector<Subpass> subpassPipelines;
+    std::vector<Subpass> subpasses;
     std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> descriptorSetLayouts;
     for (u32 subpassIdx = 0; subpassIdx < subpassOrder_.size(); ++subpassIdx) {
         const std::string &subpass_name = subpassOrder_[subpassIdx];
@@ -123,16 +123,17 @@ GraphicsPass GraphicsPassBuilder::build() {
         SubpassLayout layout = device_.createLayout(subpassInfo.descriptors_);
 
         // Create pipeline
-        subpassPipelines.emplace_back(
+        subpasses.emplace_back(
             device_.createGraphicsPipeline(
-                subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass, subpassPipelines.size(),
+                subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass, subpasses.size(),
                 subpassInfo.colorAttachmentNames_.size()
             ),
-            layout
+            layout,
+            subpass_name
         );
     }
 
-    return GraphicsPass(renderPass, subpassPipelines, attachments_, descriptorSetLayouts);
+    return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts);
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,

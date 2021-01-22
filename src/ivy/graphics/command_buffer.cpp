@@ -11,7 +11,8 @@ void CommandBuffer::bindGraphicsPipeline(const GraphicsPass &pass, u32 subpass) 
     bindGraphicsPipeline(pass.getSubpasses()[subpass].pipeline);
 }
 
-void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass &pass, const std::function<void()> &func) {
+void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass &pass,
+                                        const std::function<void()> &func) {
     Framebuffer &framebuffer = device.getFramebuffer(pass);
 
     VkRenderPassBeginInfo renderPassBeginInfo = {};
