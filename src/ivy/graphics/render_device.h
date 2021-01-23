@@ -7,12 +7,14 @@
 #include "ivy/graphics/shader.h"
 #include "ivy/graphics/vertex_description.h"
 #include "ivy/graphics/graphics_pass.h"
+#include "ivy/graphics/descriptor_set_cache.h"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <vector>
 #include <string>
 #include <stack>
 #include <functional>
+#include <unordered_map>
 
 namespace ivy {
 class Engine;
@@ -162,7 +164,8 @@ private:
     std::vector<VkSemaphore> renderFinishedSemaphores_;
     std::vector<VkFence> inFlightFences_;
 
-    VkDescriptorPool pool_ = VK_NULL_HANDLE;
+    std::vector<VkDescriptorPool> pools_;
+    std::vector<DescriptorSetCache> descriptorSetCaches_;
 };
 
 }

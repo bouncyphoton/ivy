@@ -203,7 +203,7 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     // Create descriptor pool
     //----------------------------------
 
-    // TODO: one pool for frame? so you can reset pools on a per-frame basis?
+    // TODO: figure out good pool sizes etc.
 
     std::vector<VkDescriptorPoolSize> poolSizes;
     poolSizes.emplace_back(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100});
@@ -214,11 +214,19 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     descriptorPoolCreateInfo.poolSizeCount = (u32) poolSizes.size();
     descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
-    VK_CHECKF(vkCreateDescriptorPool(device_, &descriptorPoolCreateInfo, nullptr, &pool_));
-    cleanupStack_.emplace([ = ]() {
-        vkDestroyDescriptorPool(device_, pool_, nullptr);
-    });
+    // Make pools
+    for (u32 i = 0; i < options_.numFramesInFlight; ++i) {
+        VkDescriptorPool pool;
+        VK_CHECKF(vkCreateDescriptorPool(device_, &descriptorPoolCreateInfo, nullptr, &pool));
+        cleanupStack_.emplace([ = ]() {
+            vkDestroyDescriptorPool(device_, pool, nullptr);
+        });
 
+        pools_.emplace_back(pool);
+    }
+
+    // Make descriptor set caches
+    descriptorSetCaches_.resize(options_.numFramesInFlight);
 }
 
 RenderDevice::~RenderDevice() {
@@ -246,6 +254,12 @@ void RenderDevice::beginFrame() {
 
     vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX, imageAvailableSemaphores_[currentFrame_], VK_NULL_HANDLE,
                           &swapImageIndex_);
+
+    //----------------------------------
+    // Reset descriptor set cache
+    //----------------------------------
+
+    descriptorSetCaches_[swapImageIndex_].markAllAsAvailable();
 
     //----------------------------------
     // Begin recording command buffer
@@ -689,43 +703,39 @@ VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
 }
 
 VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set) {
-    VkDescriptorSet dstSet;
-    Framebuffer &framebuffer = getFramebuffer(pass);
+    DescriptorSetCache &cache = descriptorSetCaches_[swapImageIndex_];
+    u32 subpassIdx = set.getSubpassIndex();
+    u32 setIdx = set.getSetIndex();
 
-    // TODO: descriptor set caching
-    // Try to see if exact descriptor set for this frame already exists
-    if (false) {
-        // ...
+    // Get the layout for this set in this subpass
+    VkDescriptorSetLayout layout = pass.getSubpass(subpassIdx).getSetLayout(setIdx);
 
-        return dstSet;
-    }
+    // See if the cache can give us an unused descriptor set with the same layout
+    VkDescriptorSet dstSet = cache.findSetWithLayout(layout);
 
-    // TODO: mark descriptor sets as available or used
-    // Otherwise see if there are any unused, already allocated descriptor sets
-    if (false) {
-        // ...
-    } else {
-        // Need to allocate a new descriptor set
-        // TODO: ugly but works
-        VkDescriptorSetLayout layout = pass.getSubpasses().at(set.getSubpassIndex()).layout.setLayouts.at(set.getSetIndex());
-
-        // NOTE: right now, new descriptor sets are allocated every frame - you will run out after a few seconds and crash c:
-
+    if (!dstSet) {
+        // We didn't find a descriptor set with the right layout, we need to allocate a new one
         VkDescriptorSetAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = pool_;
+        allocInfo.descriptorPool = pools_[swapImageIndex_];
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &layout;
 
+        Log::debug("Allocating new descriptor set for frame %d, subpass %d, set %d", swapImageIndex_, subpassIdx, setIdx);
+        // TODO: handle case where we can't allocate new descriptor set
         VK_CHECKF(vkAllocateDescriptorSets(device_, &allocInfo, &dstSet));
-        // TODO: if can't allocate new descriptor set
+
+        // Add it to the cache so we can find it next time we need a descriptor set with this layout
+        cache.addToCache(layout, dstSet);
     }
 
-    // Generate writes
+    // We don't cache by data yet, so we always write to the descriptor set
+    // TODO: cache by descriptor set data to prevent unnecessary updates
+
+    Framebuffer &framebuffer = getFramebuffer(pass);
     std::vector<VkWriteDescriptorSet> writes;
     std::vector<VkDescriptorImageInfo> imageInfos;
     imageInfos.reserve(set.getInputAttachmentInfos().size());
-    // TODO: triple check we're not reading/writing to invalid memory
 
     // Input attachments
     for (const InputAttachmentDescriptorInfo &desc : set.getInputAttachmentInfos()) {
@@ -745,9 +755,10 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         writes.emplace_back(write);
     }
 
-    // TODO: buffer
+    // TODO: support other descriptor types
 
     // Write to descriptor set
+    Log::debug("Writing to descriptor set %p", dstSet);
     vkUpdateDescriptorSets(device_, writes.size(), writes.data(), 0, nullptr);
 
     return dstSet;

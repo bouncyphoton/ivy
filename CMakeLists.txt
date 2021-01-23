@@ -3,7 +3,7 @@ project(ivy)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(ivy src/main.cpp src/ivy/engine.cpp src/ivy/engine.h src/ivy/types.h src/ivy/renderer.cpp src/ivy/renderer.h src/ivy/platform/platform.cpp src/ivy/platform/platform.h src/ivy/log.h src/ivy/utils/utils.cpp src/ivy/utils/utils.h src/ivy/graphics/render_device.cpp src/ivy/graphics/render_device.h src/ivy/graphics/vk_utils.cpp src/ivy/graphics/vk_utils.h src/ivy/consts.h src/ivy/graphics/command_buffer.cpp src/ivy/graphics/command_buffer.h src/ivy/options.h src/ivy/graphics/framebuffer.h src/ivy/graphics/vertex.h src/ivy/graphics/graphics_pass.cpp src/ivy/graphics/graphics_pass.h src/ivy/graphics/shader.h src/ivy/graphics/vertex_description.h src/ivy/graphics/descriptor_set.cpp src/ivy/graphics/descriptor_set.h)
+add_executable(ivy src/main.cpp src/ivy/engine.cpp src/ivy/engine.h src/ivy/types.h src/ivy/renderer.cpp src/ivy/renderer.h src/ivy/platform/platform.cpp src/ivy/platform/platform.h src/ivy/log.h src/ivy/utils/utils.cpp src/ivy/utils/utils.h src/ivy/graphics/render_device.cpp src/ivy/graphics/render_device.h src/ivy/graphics/vk_utils.cpp src/ivy/graphics/vk_utils.h src/ivy/consts.h src/ivy/graphics/command_buffer.cpp src/ivy/graphics/command_buffer.h src/ivy/options.h src/ivy/graphics/framebuffer.h src/ivy/graphics/vertex.h src/ivy/graphics/graphics_pass.cpp src/ivy/graphics/graphics_pass.h src/ivy/graphics/shader.h src/ivy/graphics/vertex_description.h src/ivy/graphics/descriptor_set.cpp src/ivy/graphics/descriptor_set.h src/ivy/graphics/descriptor_set_cache.cpp src/ivy/graphics/descriptor_set_cache.h)
 target_include_directories(ivy PRIVATE src/)
 
 # GLFW
