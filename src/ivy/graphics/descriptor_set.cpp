@@ -8,7 +8,7 @@
 namespace ivy::gfx {
 
 DescriptorSet::DescriptorSet(const GraphicsPass &pass, u32 subpass_index, u32 set_index)
-    : subpassName_(pass.getSubpasses().at(subpass_index).name),
+    : subpassName_(pass.getSubpass(subpass_index).getName()),
       layout_(pass.getDescriptorSetLayout(subpass_index, set_index)) {
 }
 

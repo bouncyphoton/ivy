@@ -8,7 +8,7 @@ void CommandBuffer::bindGraphicsPipeline(VkPipeline pipeline) {
 }
 
 void CommandBuffer::bindGraphicsPipeline(const GraphicsPass &pass, u32 subpass) {
-    bindGraphicsPipeline(pass.getSubpasses()[subpass].pipeline);
+    bindGraphicsPipeline(pass.getSubpass(subpass).getPipeline());
 }
 
 void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass &pass,
@@ -53,7 +53,7 @@ void CommandBuffer::setDescriptorSet(RenderDevice &device, const GraphicsPass &p
     VkDescriptorSet vkSet = device.getVkDescriptorSet(pass, set);
 
     vkCmdBindDescriptorSets(commandBuffer_, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pass.getSubpasses()[set.getSubpassIndex()].layout.pipelineLayout, set.getSetIndex(),
+                            pass.getSubpass(set.getSubpassIndex()).getPipelineLayout(), set.getSetIndex(),
                             1, &vkSet, 0, nullptr);
 }
 

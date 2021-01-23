@@ -30,14 +30,32 @@ struct SubpassLayout {
     std::vector<VkDescriptorSetLayout> setLayouts;
 };
 
-// TODO: do i like this? is it confusing in build() ?
-struct Subpass {
+// TODO: is it confusing in build() ?
+class Subpass {
+public:
     Subpass(VkPipeline pipeline, const SubpassLayout &layout, const std::string &name)
-        : pipeline(pipeline), layout(layout), name(name) {}
+        : pipeline_(pipeline), layout_(layout), name_(name) {}
 
-    VkPipeline pipeline;
-    SubpassLayout layout;
-    std::string name;
+    [[nodiscard]] VkPipeline getPipeline() const {
+        return pipeline_;
+    }
+
+    [[nodiscard]] VkPipelineLayout getPipelineLayout() const {
+        return layout_.pipelineLayout;
+    }
+
+    [[nodiscard]] VkDescriptorSetLayout getSetLayout(u32 set_index) {
+        return layout_.setLayouts.at(set_index);
+    }
+
+    [[nodiscard]] const std::string &getName() const {
+        return name_;
+    }
+
+private:
+    VkPipeline pipeline_;
+    SubpassLayout layout_;
+    std::string name_;
 };
 
 /**
@@ -60,8 +78,8 @@ public:
         return renderPass_;
     }
 
-    [[nodiscard]] const std::vector<Subpass> &getSubpasses() const {
-        return subpasses_;
+    [[nodiscard]] Subpass getSubpass(u32 subpass_index) const {
+        return subpasses_.at(subpass_index);
     }
 
     [[nodiscard]] const std::unordered_map<std::string, AttachmentInfo> &getAttachmentInfos() const {
