@@ -79,8 +79,8 @@ GraphicsPass GraphicsPassBuilder::build() {
     for (const DependencyInfo &info : subpassDependencyInfo_) {
         Log::debug("  - Processing dependency: %s -> %s", info.srcSubpass.c_str(), info.dstSubpass.c_str());
         VkSubpassDependency dependency = {};
-        dependency.srcSubpass = subpassLocations[info.srcSubpass];
-        dependency.dstSubpass = subpassLocations[info.dstSubpass];
+        dependency.srcSubpass = subpassLocations.at(info.srcSubpass);
+        dependency.dstSubpass = subpassLocations.at(info.dstSubpass);
         dependency.srcStageMask = info.srcStageMask;
         dependency.dstStageMask = info.dstStageMask;
         dependency.srcAccessMask = info.srcAccessFlags;
@@ -191,7 +191,6 @@ SubpassBuilder &SubpassBuilder::addShader(Shader::StageEnum shader_stage, const 
 
 SubpassBuilder &SubpassBuilder::addVertexDescription(const std::vector<VkVertexInputBindingDescription> &bindings,
                                                      const std::vector<VkVertexInputAttributeDescription> &attributes) {
-    // TODO: support multiple vertex descriptions
     subpass_.vertexDescription_ = VertexDescription(bindings, attributes);
     return *this;
 }
