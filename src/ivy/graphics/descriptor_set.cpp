@@ -4,6 +4,7 @@
 #include "ivy/graphics/vk_utils.h"
 #include <set>
 #include <unordered_map>
+#include <cstring>
 
 namespace ivy::gfx {
 
@@ -14,6 +15,15 @@ DescriptorSet::DescriptorSet(const GraphicsPass &pass, u32 subpass_index, u32 se
 
 void DescriptorSet::setInputAttachment(u32 binding, const std::string &attachment_name) {
     inputAttachmentInfos_.emplace_back(binding, attachment_name);
+}
+
+void DescriptorSet::setUniformBuffer(u32 binding, const void *data, size_t size) {
+    u32 offset = uniformBufferData_.size();
+    u32 range = size;
+
+    uniformBufferData_.resize(offset + range);
+    std::memcpy(uniformBufferData_.data() + offset, data, range);
+    uniformBufferInfos_.emplace_back(binding, offset, range);
 }
 
 void DescriptorSet::validate() const {
@@ -50,6 +60,12 @@ void DescriptorSet::validate() const {
     for (const InputAttachmentDescriptorInfo &info : inputAttachmentInfos_) {
         validateBinding(info.binding, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
     }
+
+    // Check buffer bindings
+    for (const UniformBufferDescriptorInfo &info : uniformBufferInfos_) {
+        validateBinding(info.binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    }
+
     // TODO: check other bindings when they get implemented
 
     // If we've seen fewer bindings than there are valid bindings, we're missing at least one

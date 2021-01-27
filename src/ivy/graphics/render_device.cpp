@@ -227,6 +227,35 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
 
     // Make descriptor set caches
     descriptorSetCaches_.resize(options_.numFramesInFlight);
+
+    //----------------------------------
+    // Create uniform buffer
+    //----------------------------------
+
+    uniformBuffers_.resize(options_.numFramesInFlight);
+    uniformBufferMappedPointers_.resize(options_.numFramesInFlight);
+    uniformBufferOffsets_.resize(options_.numFramesInFlight);
+
+    for (u32 i = 0; i < options_.numFramesInFlight; ++i) {
+        VmaAllocationCreateInfo allocCI = {};
+        allocCI.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        allocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+        VkBufferCreateInfo bufferCI = {};
+        bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferCI.size = 1024 * 1024;
+        bufferCI.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocation allocation;
+        VmaAllocationInfo allocInfo;
+        VK_CHECKF(vmaCreateBuffer(allocator_, &bufferCI, &allocCI, &uniformBuffers_[i], &allocation, &allocInfo));
+        cleanupStack_.emplace([ = ]() {
+            vmaDestroyBuffer(allocator_, uniformBuffers_[i], allocation);
+        });
+
+        uniformBufferMappedPointers_.at(i) = allocInfo.pMappedData;
+    }
 }
 
 RenderDevice::~RenderDevice() {
@@ -256,10 +285,11 @@ void RenderDevice::beginFrame() {
                           &swapImageIndex_);
 
     //----------------------------------
-    // Reset descriptor set cache
+    // Reset per-frame descriptor data
     //----------------------------------
 
     descriptorSetCaches_[swapImageIndex_].markAllAsAvailable();
+    uniformBufferOffsets_[swapImageIndex_] = 0;
 
     //----------------------------------
     // Begin recording command buffer
@@ -544,7 +574,9 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
 
         // Per in-flight frame
         for (VkImageView &swapchainImageView : swapchainImageViews_) {
-            // TODO: redundant ?
+            // These two hold almost the same data.
+            // unordered_map is for keeping track of views by attachment name
+            // vector is for framebuffer create info
             std::unordered_map<std::string, VkImageView> attachmentViews;
             std::vector<VkImageView> viewsVector;
 
@@ -703,7 +735,7 @@ VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
 }
 
 VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set) {
-    DescriptorSetCache &cache = descriptorSetCaches_[swapImageIndex_];
+    DescriptorSetCache &cache = descriptorSetCaches_.at(swapImageIndex_);
     u32 subpassIdx = set.getSubpassIndex();
     u32 setIdx = set.getSetIndex();
 
@@ -734,10 +766,14 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
 
     Framebuffer &framebuffer = getFramebuffer(pass);
     std::vector<VkWriteDescriptorSet> writes;
+
+    //----------------------------------
+    // Input attachments
+    //----------------------------------
+
     std::vector<VkDescriptorImageInfo> imageInfos;
     imageInfos.reserve(set.getInputAttachmentInfos().size());
 
-    // Input attachments
     for (const InputAttachmentDescriptorInfo &desc : set.getInputAttachmentInfos()) {
         VkDescriptorImageInfo imageInfo = {};
         imageInfo.sampler = VK_NULL_HANDLE;
@@ -752,6 +788,52 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         write.descriptorCount = 1;
         write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         write.pImageInfo = &imageInfos.back();
+        writes.emplace_back(write);
+    }
+
+    //----------------------------------
+    // Uniform buffers
+    //----------------------------------
+
+    std::vector<VkDescriptorBufferInfo> bufferInfos;
+    bufferInfos.reserve(set.getUniformBufferInfos().size());
+
+    const u8 *srcPtr = set.getUniformBufferData().data();
+    u8 *dstPtr = reinterpret_cast<u8*>(uniformBufferMappedPointers_.at(swapImageIndex_));
+
+    VkDeviceSize &dstOffset = uniformBufferOffsets_.at(swapImageIndex_);
+    u32 minAlignment = limits_.minUniformBufferOffsetAlignment;
+
+    // Create descriptor writes that reference uniform buffer data
+    VkBuffer buffer = uniformBuffers_.at(swapImageIndex_);
+    for (const UniformBufferDescriptorInfo &info : set.getUniformBufferInfos()) {
+        // TODO: make sure we aren't overrunning the buffer
+
+        // Copy data into buffer
+        std::memcpy(dstPtr + dstOffset, srcPtr + info.dataOffset, info.dataRange);
+        Log::debug("Copied %d bytes for uniform buffers at %d", info.dataRange, dstOffset);
+
+        // Set buffer info
+        VkDescriptorBufferInfo bufferInfo = {};
+        bufferInfo.buffer = buffer;
+        bufferInfo.offset = dstOffset;
+        bufferInfo.range = info.dataRange;
+        bufferInfos.emplace_back(bufferInfo);
+
+        // Add to dstOffset, taking alignment into account
+        dstOffset += info.dataRange;
+        if (dstOffset % minAlignment != 0) {
+            dstOffset += minAlignment - (dstOffset % minAlignment);
+        }
+
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = dstSet;
+        write.dstBinding = info.binding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.pBufferInfo = &bufferInfos.back();
+
         writes.emplace_back(write);
     }
 
@@ -876,6 +958,8 @@ void RenderDevice::choosePhysicalDevice() {
 
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(physicalDevice_, &properties);
+    limits_ = properties.limits;
+
     Log::info("Using physical device: %s", properties.deviceName);
 }
 
