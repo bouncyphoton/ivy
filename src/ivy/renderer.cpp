@@ -76,16 +76,21 @@ void Renderer::render() {
 
         // Subpass 0, g-buffer
         {
+            // Bind graphics pipeline
+            cmd.bindGraphicsPipeline(pass, subpassIdx);
+
+            // Set MVP data on CPU
             MVP mvpData = {};
             mvpData.proj = glm::perspective(glm::half_pi<f32>(), 800.0f / 600.0f, 0.01f, 100.0f);
             mvpData.view = glm::lookAt(glm::vec3(0, 0, 2), glm::vec3(0), glm::vec3(0, 1, 0));
             mvpData.model = glm::translate(glm::mat4(1), glm::vec3(0, std::sin(glfwGetTime()), 0));
 
+            // Put MVP data in a descriptor set and bind it
             gfx::DescriptorSet mvpSet(pass, subpassIdx, 0);
             mvpSet.setUniformBuffer(0, mvpData);
             cmd.setDescriptorSet(device_, pass, mvpSet);
 
-            cmd.bindGraphicsPipeline(pass, subpassIdx);
+            // Bind vertex buffer and draw
             cmd.bindVertexBuffer(vertexBuffer_);
             cmd.draw(COUNTOF(vertices), 1, 0, 0);
         }
@@ -95,14 +100,17 @@ void Renderer::render() {
             ++subpassIdx;
             cmd.nextSubpass();
 
+            // Bind graphics pipeline
             cmd.bindGraphicsPipeline(pass, subpassIdx);
 
+            // Set our input attachments in descriptor set and bind it
             gfx::DescriptorSet inputAttachmentsSet(pass, subpassIdx, 0);
             inputAttachmentsSet.setInputAttachment(0, "albedo");
             inputAttachmentsSet.setInputAttachment(1, "position");
             cmd.setDescriptorSet(device_, pass, inputAttachmentsSet);
 
-            cmd.draw(3, 1, 0, 0); // Fullscreen triangle
+            // Draw our fullscreen triangle
+            cmd.draw(3, 1, 0, 0);
         }
     });
 
