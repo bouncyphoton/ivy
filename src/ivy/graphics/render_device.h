@@ -137,6 +137,7 @@ private:
     VkSurfaceKHR surface_ = VK_NULL_HANDLE;
 
     VkPhysicalDevice physicalDevice_ = VK_NULL_HANDLE;
+    VkPhysicalDeviceLimits limits_ = {};
     u32 graphicsFamilyIndex_ = 0;
     u32 computeFamilyIndex_ = 0;
     u32 presentFamilyIndex_ = 0;
@@ -166,6 +167,10 @@ private:
 
     std::vector<VkDescriptorPool> pools_;
     std::vector<DescriptorSetCache> descriptorSetCaches_;
+
+    std::vector<VkBuffer> uniformBuffers_;
+    std::vector<VkDeviceSize> uniformBufferOffsets_;
+    std::vector<void *> uniformBufferMappedPointers_;
 };
 
 }

@@ -28,6 +28,16 @@ struct InputAttachmentDescriptorInfo {
     std::string attachmentName;
 };
 
+struct UniformBufferDescriptorInfo {
+    UniformBufferDescriptorInfo(u32 binding, u32 data_offset, u32 data_range)
+        : binding(binding), dataOffset(data_offset), dataRange(data_range) {}
+
+    u32 binding;
+    u32 dataOffset;
+    u32 dataRange;
+};
+
+// TODO: allow already set parts of descriptor set to be updated
 // TODO: array descriptors
 
 /**
@@ -38,6 +48,13 @@ public:
     DescriptorSet(const GraphicsPass &pass, u32 subpass_index, u32 set_index);
 
     void setInputAttachment(u32 binding, const std::string &attachment_name);
+
+    void setUniformBuffer(u32 binding, const void *data, size_t size);
+
+    template <typename T>
+    void setUniformBuffer(u32 binding, const T &data) {
+        setUniformBuffer(binding, &data, sizeof(T));
+    }
 
     void validate() const;
 
@@ -53,10 +70,21 @@ public:
         return inputAttachmentInfos_;
     }
 
+    [[nodiscard]] const std::vector<UniformBufferDescriptorInfo> &getUniformBufferInfos() const {
+        return uniformBufferInfos_;
+    }
+
+    [[nodiscard]] const std::vector<u8> &getUniformBufferData() const {
+        return uniformBufferData_;
+    }
+
 private:
     std::string subpassName_;
     DescriptorSetLayout layout_;
+
     std::vector<InputAttachmentDescriptorInfo> inputAttachmentInfos_;
+    std::vector<UniformBufferDescriptorInfo> uniformBufferInfos_;
+    std::vector<u8> uniformBufferData_;
 };
 
 }
