@@ -31,6 +31,24 @@ public:
      */
     void markAllAsAvailable();
 
+    /**
+     * \brief Count and return how many descriptor sets are cached
+     * \return Total cached
+     */
+    size_t countTotalCached();
+
+    /**
+     * \brief Count and return how many descriptor sets are available
+     * \return Total available
+     */
+    size_t countNumAvailable();
+
+    /**
+     * \brief Count and return how many descriptor sets were retrieved from the cache
+     * \return Total used
+     */
+    size_t countNumUsed();
+
 private:
     std::unordered_map<VkDescriptorSetLayout, std::stack<VkDescriptorSet>> availableSetStacks_;
     std::unordered_map<VkDescriptorSetLayout, std::stack<VkDescriptorSet>> usedSetStacks_;

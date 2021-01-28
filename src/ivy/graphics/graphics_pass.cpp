@@ -211,11 +211,11 @@ SubpassInfo SubpassBuilder::build() {
 }
 
 SubpassBuilder &SubpassBuilder::addDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags,
-                                              VkDescriptorType type, u32 count) {
+                                              VkDescriptorType type) {
     VkDescriptorSetLayoutBinding layoutBinding = {};
     layoutBinding.binding = binding;
     layoutBinding.descriptorType = type;
-    layoutBinding.descriptorCount = count;
+    layoutBinding.descriptorCount = 1;
     layoutBinding.stageFlags = stage_flags;
 
     subpass_.descriptors_[set][binding] = layoutBinding;

@@ -235,6 +235,7 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     uniformBuffers_.resize(options_.numFramesInFlight);
     uniformBufferMappedPointers_.resize(options_.numFramesInFlight);
     uniformBufferOffsets_.resize(options_.numFramesInFlight);
+    uniformBufferSize_ = 1024 * 1024;
 
     for (u32 i = 0; i < options_.numFramesInFlight; ++i) {
         VmaAllocationCreateInfo allocCI = {};
@@ -243,7 +244,7 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
 
         VkBufferCreateInfo bufferCI = {};
         bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferCI.size = 1024 * 1024;
+        bufferCI.size = uniformBufferSize_;
         bufferCI.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
         bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -302,6 +303,22 @@ void RenderDevice::beginFrame() {
 
 void RenderDevice::endFrame() {
     VK_CHECKF(vkEndCommandBuffer(commandBuffers_[swapImageIndex_]));
+
+    //----------------------------------
+    // Debug stats for this frame
+    //----------------------------------
+
+    if (consts::DEBUG) {
+        Log::debug("+-- Frame stats for %d -----------", swapImageIndex_);
+        Log::debug("| %d/%d bytes (%.2f%%) of the buffer were used for uniform buffers",
+                   uniformBufferOffsets_[swapImageIndex_], uniformBufferSize_,
+                   100 * (uniformBufferOffsets_[swapImageIndex_] / (float)uniformBufferSize_));
+        Log::debug("| %d descriptor sets were used this frame",
+                   descriptorSetCaches_[swapImageIndex_].countNumUsed());
+        Log::debug("| %d descriptor sets are cached for this frame",
+                   descriptorSetCaches_[swapImageIndex_].countTotalCached());
+        Log::debug("+-------------------------------");
+    }
 
     //----------------------------------
     // Queue submission and sync
@@ -753,7 +770,10 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &layout;
 
-        Log::debug("Allocating new descriptor set for frame %d, subpass %d, set %d", swapImageIndex_, subpassIdx, setIdx);
+        if (consts::DEBUG) {
+            Log::debug("Allocating new descriptor set for frame %d, subpass %d, set %d",
+                       swapImageIndex_, subpassIdx, setIdx);
+        }
         // TODO: handle case where we can't allocate new descriptor set
         VK_CHECKF(vkAllocateDescriptorSets(device_, &allocInfo, &dstSet));
 
@@ -799,7 +819,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     bufferInfos.reserve(set.getUniformBufferInfos().size());
 
     const u8 *srcPtr = set.getUniformBufferData().data();
-    u8 *dstPtr = reinterpret_cast<u8*>(uniformBufferMappedPointers_.at(swapImageIndex_));
+    u8 *dstPtr = reinterpret_cast<u8 *>(uniformBufferMappedPointers_.at(swapImageIndex_));
 
     VkDeviceSize &dstOffset = uniformBufferOffsets_.at(swapImageIndex_);
     u32 minAlignment = limits_.minUniformBufferOffsetAlignment;
@@ -807,11 +827,14 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     // Create descriptor writes that reference uniform buffer data
     VkBuffer buffer = uniformBuffers_.at(swapImageIndex_);
     for (const UniformBufferDescriptorInfo &info : set.getUniformBufferInfos()) {
-        // TODO: make sure we aren't overrunning the buffer
+        if (dstOffset + info.dataRange > uniformBufferSize_) {
+            Log::fatal("This uniform buffer for descriptor set %d in subpass %d will overrun the buffer! "
+                       "Too much data was set via uniform buffers this frame.",
+                       set.getSetIndex(), set.getSubpassIndex());
+        }
 
         // Copy data into buffer
         std::memcpy(dstPtr + dstOffset, srcPtr + info.dataOffset, info.dataRange);
-        Log::debug("Copied %d bytes for uniform buffers at %d", info.dataRange, dstOffset);
 
         // Set buffer info
         VkDescriptorBufferInfo bufferInfo = {};
@@ -840,7 +863,6 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     // TODO: support other descriptor types
 
     // Write to descriptor set
-    Log::debug("Writing to descriptor set %p", dstSet);
     vkUpdateDescriptorSets(device_, writes.size(), writes.data(), 0, nullptr);
 
     return dstSet;

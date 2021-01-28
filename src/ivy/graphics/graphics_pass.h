@@ -97,10 +97,10 @@ public:
         : renderPass_(render_pass), subpasses_(subpasses),
           attachmentInfos_(attachment_infos), descriptorSetLayouts_(descriptorSetLayouts) {}
 
-  /**
-   * \brief Get the VkRenderPass for this graphics pass
-   * \return VkRenderPass
-   */
+    /**
+     * \brief Get the VkRenderPass for this graphics pass
+     * \return VkRenderPass
+     */
     [[nodiscard]] VkRenderPass getVkRenderPass() const {
         return renderPass_;
     }
@@ -201,11 +201,9 @@ public:
      * \param binding The binding in the descriptor set
      * \param stage_flags Which shader stage the descriptor set belongs to
      * \param type What type of descriptor
-     * \param count How many of the descriptor to add
      * \return SubpassBuilder
      */
-    SubpassBuilder &addDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags, VkDescriptorType type,
-                                  u32 count = 1);
+    SubpassBuilder &addDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags, VkDescriptorType type);
 
     /**
      * \brief Build the subpass

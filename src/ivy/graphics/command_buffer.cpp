@@ -1,5 +1,6 @@
 #include "command_buffer.h"
 #include "render_device.h"
+#include "ivy/consts.h"
 
 namespace ivy::gfx {
 
@@ -47,8 +48,9 @@ void CommandBuffer::nextSubpass() {
 }
 
 void CommandBuffer::setDescriptorSet(RenderDevice &device, const GraphicsPass &pass, const DescriptorSet &set) {
-    // TODO: turn off descriptor set validation check for release builds
-    set.validate();
+    if (consts::DEBUG) {
+        set.validate();
+    }
 
     VkDescriptorSet vkSet = device.getVkDescriptorSet(pass, set);
 
