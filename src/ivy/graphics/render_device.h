@@ -171,6 +171,7 @@ private:
     std::vector<VkBuffer> uniformBuffers_;
     std::vector<VkDeviceSize> uniformBufferOffsets_;
     std::vector<void *> uniformBufferMappedPointers_;
+    VkDeviceSize uniformBufferSize_;
 };
 
 }

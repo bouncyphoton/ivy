@@ -3,7 +3,7 @@
 namespace ivy::gfx {
 
 VkDescriptorSet DescriptorSetCache::findSetWithLayout(VkDescriptorSetLayout layout) {
-    std::stack<VkDescriptorSet> availableSets = availableSetStacks_[layout];
+    std::stack<VkDescriptorSet> &availableSets = availableSetStacks_[layout];
 
     if (availableSets.empty()) {
         return VK_NULL_HANDLE;
@@ -11,6 +11,7 @@ VkDescriptorSet DescriptorSetCache::findSetWithLayout(VkDescriptorSetLayout layo
 
     VkDescriptorSet set = availableSets.top();
     availableSets.pop();
+    usedSetStacks_[layout].push(set);
 
     return set;
 }
@@ -33,4 +34,25 @@ void DescriptorSetCache::markAllAsAvailable() {
     }
 }
 
+size_t DescriptorSetCache::countTotalCached() {
+    return countNumUsed() + countNumAvailable();
 }
+
+size_t DescriptorSetCache::countNumUsed() {
+    size_t numUsed = 0;
+    for (const auto &stacks : usedSetStacks_) {
+        numUsed += stacks.second.size();
+    }
+    return numUsed;
+}
+
+size_t DescriptorSetCache::countNumAvailable() {
+    size_t numAvailable = 0;
+    for (const auto &stacks : availableSetStacks_) {
+        numAvailable += stacks.second.size();
+    }
+    return numAvailable;
+}
+
+}
+
