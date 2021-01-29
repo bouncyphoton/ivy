@@ -57,8 +57,10 @@ GraphicsPass GraphicsPassBuilder::build() {
         for (const std::string &inputAttachmentName : subpassInfos_[subpassName].inputAttachmentNames_) {
             Log::debug("  - Processing input attachment: %s", inputAttachmentName.c_str());
 
-            if (consts::DEBUG && attachmentLocations.find(inputAttachmentName) == attachmentLocations.end()) {
-                Log::fatal("Input attachment '%s' was not added to the graphics pass", inputAttachmentName.c_str());
+            if constexpr (consts::DEBUG) {
+                if (attachmentLocations.find(inputAttachmentName) == attachmentLocations.end()) {
+                    Log::fatal("Input attachment '%s' was not added to the graphics pass", inputAttachmentName.c_str());
+                }
             }
 
             // Create an attachment reference for this input attachment
@@ -86,8 +88,10 @@ GraphicsPass GraphicsPassBuilder::build() {
 
             Log::debug("  - Processing color attachment: %s", colorAttachmentName.c_str());
 
-            if (consts::DEBUG && attachmentLocations.find(colorAttachmentName) == attachmentLocations.end()) {
-                Log::fatal("Color attachment '%s' was not added to the graphics pass", colorAttachmentName.c_str());
+            if constexpr (consts::DEBUG) {
+                if (attachmentLocations.find(colorAttachmentName) == attachmentLocations.end()) {
+                    Log::fatal("Color attachment '%s' was not added to the graphics pass", colorAttachmentName.c_str());
+                }
             }
 
             // Create an attachment reference for this color attachment
@@ -129,7 +133,7 @@ GraphicsPass GraphicsPassBuilder::build() {
     for (const DependencyInfo &info : subpassDependencyInfo_) {
         Log::debug("  - Processing dependency: %s -> %s", info.srcSubpass.c_str(), info.dstSubpass.c_str());
 
-        if (consts::DEBUG) {
+        if constexpr (consts::DEBUG) {
             if (subpassLocations.find(info.srcSubpass) == subpassLocations.end()) {
                 Log::fatal("Subpass dependency could not be processed because '%s' is not a subpass in this graphics pass",
                            info.srcSubpass.c_str());
@@ -223,7 +227,7 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attac
                                                         VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
                                                         VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op,
                                                         VkImageLayout initial_layout, VkImageLayout final_layout) {
-    if (consts::DEBUG) {
+    if constexpr (consts::DEBUG) {
         if (attachments_.find(attachment_name) != attachments_.end()) {
             Log::fatal("Attachment '%s' was added multiple times to the same graphics pass!", attachment_name.c_str());
         }
@@ -254,7 +258,7 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachmentSwapchain() {
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addSubpass(const std::string &subpass_name, const SubpassInfo &subpass) {
-    if (consts::DEBUG) {
+    if constexpr (consts::DEBUG) {
         if (subpass_name == GraphicsPass::SwapchainName) {
             Log::fatal("'%s' is a reserved subpass name", subpass_name.c_str());
         }

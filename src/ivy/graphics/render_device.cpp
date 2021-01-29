@@ -203,14 +203,19 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     // Create descriptor pool
     //----------------------------------
 
-    // TODO: figure out good pool sizes etc.
+    // TODO: figure out good pool sizes and maxSets
 
     std::vector<VkDescriptorPoolSize> poolSizes;
-    poolSizes.emplace_back(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100});
+    poolSizes.emplace_back(VkDescriptorPoolSize{
+        VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, limits_.maxDescriptorSetInputAttachments * 2
+    });
+    poolSizes.emplace_back(VkDescriptorPoolSize{
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, limits_.maxDescriptorSetUniformBuffers * 2
+    });
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolCreateInfo.maxSets = 100; // TODO ?
+    descriptorPoolCreateInfo.maxSets = 128;
     descriptorPoolCreateInfo.poolSizeCount = (u32) poolSizes.size();
     descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
@@ -822,7 +827,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     u8 *dstPtr = reinterpret_cast<u8 *>(uniformBufferMappedPointers_.at(swapImageIndex_));
 
     VkDeviceSize &dstOffset = uniformBufferOffsets_.at(swapImageIndex_);
-    u32 minAlignment = limits_.minUniformBufferOffsetAlignment;
+    u32 minAlignment = (u32) limits_.minUniformBufferOffsetAlignment;
 
     // Create descriptor writes that reference uniform buffer data
     VkBuffer buffer = uniformBuffers_.at(swapImageIndex_);

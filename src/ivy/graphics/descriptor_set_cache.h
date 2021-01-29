@@ -9,6 +9,9 @@ namespace ivy::gfx {
 
 class RenderDevice;
 
+/**
+ * \brief A cache for allocated descriptor sets
+ */
 class DescriptorSetCache {
 public:
 
