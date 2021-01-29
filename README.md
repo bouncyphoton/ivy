@@ -4,6 +4,8 @@ This is a personal project of mine to improve my Vulkan knowledge and experience
 
 The goal is to create a Vulkan renderer frontend that is easy to use and hard to screw up.
 
+![Latest image](img/latest.png)
+
 ### Example code
 
 The following example code is for a very simple deferred renderer.
