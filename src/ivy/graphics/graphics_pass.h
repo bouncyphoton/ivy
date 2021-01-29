@@ -91,6 +91,11 @@ public:
      */
     inline static const char *SwapchainName = "__swapchain";
 
+    /**
+     * \brief Used for referencing unused attachments
+     */
+    inline static const char *UnusedName = "__unused";
+
     explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
                           const std::unordered_map<std::string, AttachmentInfo> &attachment_infos,
                           const std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> &descriptorSetLayouts)
@@ -191,9 +196,10 @@ public:
     /**
      * \brief Add a color attachment to the subpass
      * \param attachment_name Name of the attachment
+     * \param location The location of the color attachment
      * \return SubpassBuilder
      */
-    SubpassBuilder &addColorAttachment(const std::string &attachment_name);
+    SubpassBuilder &addColorAttachment(const std::string &attachment_name, u32 location);
 
     /**
      * \brief Add a descriptor to the subpass
