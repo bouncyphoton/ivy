@@ -6,6 +6,9 @@
 
 namespace ivy::gfx {
 
+/**
+ * \brief Holds data for shader creation
+ */
 class Shader {
 public:
     enum class StageEnum {
@@ -16,10 +19,18 @@ public:
 
     Shader(StageEnum stage, const std::string &path) : stage_(stage), path_(path) {}
 
+    /**
+     * \brief Get the shader stage that this shader represents
+     * \return VkShaderStageFlagBits
+     */
     [[nodiscard]] VkShaderStageFlagBits getStage() const {
         return static_cast<VkShaderStageFlagBits>(stage_);
     }
 
+    /**
+     * \brief Get the path to the shader bytecode
+     * \return Path to shader bytecode
+     */
     [[nodiscard]] std::string getShaderPath() const {
         return path_;
     }

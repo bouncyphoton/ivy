@@ -5,6 +5,9 @@
 
 namespace ivy::gfx {
 
+/**
+ * \brief A vertex with a position (3 components) and color (3 components)
+ */
 class VertexP3C3 {
 public:
     VertexP3C3(glm::vec3 position, glm::vec3 color)
