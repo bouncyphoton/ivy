@@ -91,11 +91,6 @@ public:
      */
     inline static const char *SwapchainName = "__swapchain";
 
-    /**
-     * \brief Used for referencing unused attachments
-     */
-    inline static const char *UnusedName = "__unused";
-
     explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
                           const std::unordered_map<std::string, AttachmentInfo> &attachment_infos,
                           const std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> &descriptorSetLayouts)
@@ -138,6 +133,15 @@ public:
     }
 
 private:
+    // Friend so that they can access UnusedName
+    friend class GraphicsPassBuilder;
+    friend class SubpassBuilder;
+
+    /**
+     * \brief Used for referencing unused attachments
+     */
+    inline static const char *UnusedName = "__unused";
+
     VkRenderPass renderPass_;
     std::vector<Subpass> subpasses_;
     std::unordered_map<std::string, AttachmentInfo> attachmentInfos_;
