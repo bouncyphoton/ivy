@@ -44,6 +44,15 @@ GraphicsPass GraphicsPassBuilder::build() {
             inputAttachmentReferences[subpassName].emplace_back(reference);
         }
         for (const std::string &colorAttachmentName : subpassInfos_[subpassName].colorAttachmentNames_) {
+            // Mark unused attachments as unused and continue
+            if (colorAttachmentName == GraphicsPass::UnusedName) {
+                VkAttachmentReference reference = {};
+                reference.attachment = VK_ATTACHMENT_UNUSED;
+
+                colorAttachmentReferences[subpassName].emplace_back(reference);
+                continue;
+            }
+
             Log::debug("  - Processing color attachment: %s", colorAttachmentName.c_str());
             VkAttachmentReference reference = {};
             reference.attachment = attachmentLocations[colorAttachmentName];
@@ -201,8 +210,17 @@ SubpassBuilder &SubpassBuilder::addInputAttachment(const std::string &attachment
     return *this;
 }
 
-SubpassBuilder &SubpassBuilder::addColorAttachment(const std::string &attachment_name) {
-    subpass_.colorAttachmentNames_.emplace_back(attachment_name);
+SubpassBuilder &SubpassBuilder::addColorAttachment(const std::string &attachment_name, u32 location) {
+    std::vector<std::string> &names = subpass_.colorAttachmentNames_;
+
+    // If we need to make the vector bigger before we can add our attachment, fill it with Unused
+    if (location >= names.size()) {
+        names.resize(location + 1, GraphicsPass::UnusedName);
+    }
+
+    // Set the attachment
+    names[location] = attachment_name;
+
     return *this;
 }
 
