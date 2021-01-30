@@ -42,8 +42,16 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     renderPassBeginInfo.clearValueCount = clearValues.size();
     renderPassBeginInfo.pClearValues = clearValues.data();
 
+    // Flip the viewport upside down
+    VkViewport viewport = {};
+    viewport.width = (f32) renderPassBeginInfo.renderArea.extent.width;
+    viewport.height = -1.0f * (f32) renderPassBeginInfo.renderArea.extent.height;
+    viewport.x = (f32) renderPassBeginInfo.renderArea.offset.x;
+    viewport.y = (f32) renderPassBeginInfo.renderArea.offset.y + (f32) renderPassBeginInfo.renderArea.extent.height;
+
     // Start render pass, call user functions, end render pass
     vkCmdBeginRenderPass(commandBuffer_, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdSetViewport(commandBuffer_, 0, 1, &viewport);
     func();
     vkCmdEndRenderPass(commandBuffer_);
 }

@@ -519,7 +519,7 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     rasterizationCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizationCreateInfo.lineWidth = 1.0f;
     rasterizationCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizationCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizationCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizationCreateInfo.depthBiasEnable = VK_FALSE;
 
     // Multisampling
@@ -554,6 +554,14 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     colorBlendCreateInfo.attachmentCount = (u32) colorBlendAttachmentStates.size();
     colorBlendCreateInfo.pAttachments = colorBlendAttachmentStates.data();
 
+    // Dynamic state
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT };
+
+    VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
+    dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicStateCreateInfo.pDynamicStates = dynamicStates;
+    dynamicStateCreateInfo.dynamicStateCount = COUNTOF(dynamicStates);
+
     VkGraphicsPipelineCreateInfo ci = {};
     ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     ci.pNext = nullptr;
@@ -568,7 +576,7 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     ci.pMultisampleState = &multisampleCreateInfo;
     ci.pDepthStencilState = has_depth_attachment ? &depthStencilCreateInfo : nullptr;
     ci.pColorBlendState = &colorBlendCreateInfo;
-    ci.pDynamicState = nullptr; // TODO: dynamic state
+    ci.pDynamicState = &dynamicStateCreateInfo;
     ci.layout = layout;
     ci.renderPass = render_pass;
     ci.subpass = subpass;

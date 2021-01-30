@@ -6,7 +6,6 @@
 
 namespace ivy {
 
-// TODO: flip viewport
 // TODO: textures
 // TODO: multiple render passes
 
