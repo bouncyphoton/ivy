@@ -23,23 +23,28 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     renderPassBeginInfo.renderArea.offset = {0, 0};
     renderPassBeginInfo.renderArea.extent = framebuffer.getExtent();
 
-    VkClearValue clearColor = {};
-    clearColor.color.float32[0] = 0.0f;
-    clearColor.color.float32[1] = 0.0f;
-    clearColor.color.float32[2] = 0.0f;
-    clearColor.color.float32[3] = 1.0f;
-    clearColor.depthStencil = {0.0f, 0};
+    // Generate clear values for each attachment
+    std::vector<VkClearValue> clearValues;
+    clearValues.reserve(pass.getAttachmentInfos().size());
+    for (const auto &infoPair : pass.getAttachmentInfos()) {
+        const AttachmentInfo &info = infoPair.second;
+        VkClearValue value = {};
 
-    // Need a clear color for each attachment
-    std::vector<VkClearValue> clearColors(pass.getAttachmentInfos().size(), clearColor);
+        // VkClearValue unions color and depth stencil
+        if (info.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+            value.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        } else if (info.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+            value.depthStencil = {1.0f, 0};
+        }
 
-    renderPassBeginInfo.clearValueCount = clearColors.size();
-    renderPassBeginInfo.pClearValues = clearColors.data();
+        clearValues.emplace_back(value);
+    }
+    renderPassBeginInfo.clearValueCount = clearValues.size();
+    renderPassBeginInfo.pClearValues = clearValues.data();
 
+    // Start render pass, call user functions, end render pass
     vkCmdBeginRenderPass(commandBuffer_, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
     func();
-
     vkCmdEndRenderPass(commandBuffer_);
 }
 

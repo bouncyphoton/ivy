@@ -89,11 +89,13 @@ public:
      * \param layout Pipeline layout
      * \param render_pass Render pass
      * \param subpass Subpass index
-     * \param num_color_attachments The number of color attachments for the subpass
+     * \param num_color_attachments The number of color attachments for the pipeline
+     * \param has_depth_attachment Whether or not there is a depth attachment
      * \return VkPipeline
      */
     VkPipeline createGraphicsPipeline(const std::vector<Shader> &shaders, const VertexDescription &vertex_description,
-                                      VkPipelineLayout layout, VkRenderPass render_pass, u32 subpass, u32 num_color_attachments);
+                                      VkPipelineLayout layout, VkRenderPass render_pass, u32 subpass,
+                                      u32 num_color_attachments, bool has_depth_attachment);
 
     /**
      * \brief Get (or create if doesn't exist) the current swapchain framebuffer for a given graphics pass

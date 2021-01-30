@@ -15,8 +15,8 @@ layout (location = 0) out VertexData {
 } VS_OUT;
 
 void main() {
-    vec4 pos = uMVP.projection * uMVP.view * uMVP.model * vec4(inPosition, 1.0);
-    gl_Position = pos;
+    vec4 pos = uMVP.model * vec4(inPosition, 1.0);
+    gl_Position = uMVP.projection * uMVP.view * pos;
 
     VS_OUT.color = inColor;
     VS_OUT.worldPos = pos.xyz;

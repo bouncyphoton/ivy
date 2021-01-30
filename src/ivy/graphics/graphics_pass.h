@@ -8,6 +8,7 @@
 #include <vulkan/vulkan.h>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 
 namespace ivy::gfx {
 
@@ -160,6 +161,7 @@ private:
     VertexDescription vertexDescription_;
     std::vector<std::string> inputAttachmentNames_;
     std::vector<std::string> colorAttachmentNames_;
+    std::optional<std::string> depthAttachmentName_;
 
     LayoutBindingsMap_t descriptors_;
 };
@@ -199,11 +201,18 @@ public:
 
     /**
      * \brief Add a color attachment to the subpass
-     * \param attachment_name Name of the attachment
+     * \param attachment_name Name of the attachment to reference
      * \param location The location of the color attachment
      * \return SubpassBuilder
      */
     SubpassBuilder &addColorAttachment(const std::string &attachment_name, u32 location);
+
+    /**
+     * \brief Add a depth attachment to the subpass
+     * \param attachment_name Name of the attachment to reference
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &addDepthAttachment(const std::string &attachment_name);
 
     /**
      * \brief Add a descriptor to the subpass

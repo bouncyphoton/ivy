@@ -3,6 +3,7 @@
 #include "ivy/graphics/vk_utils.h"
 #include "ivy/log.h"
 #include "ivy/consts.h"
+#include <unordered_set>
 
 namespace ivy::gfx {
 
@@ -21,6 +22,9 @@ GraphicsPass GraphicsPassBuilder::build() {
     // Used to turn an attachment name into an index for attachmentDescriptions
     std::unordered_map<std::string, u32> attachmentLocations;
 
+    // A set of unreferenced attachments for validation
+    std::unordered_set<std::string> unreferencedAttachments;
+
     for (const auto &attachmentPair : attachments_) {
         const std::string &name = attachmentPair.first;
         const AttachmentInfo &info = attachmentPair.second;
@@ -28,6 +32,7 @@ GraphicsPass GraphicsPassBuilder::build() {
 
         attachmentLocations[name] = attachmentDescriptions.size();
         attachmentDescriptions.emplace_back(info.description);
+        unreferencedAttachments.emplace(name);
     }
 
     //--------------------------------------
@@ -44,6 +49,9 @@ GraphicsPass GraphicsPassBuilder::build() {
     // Holds attachment references for color attachments in subpasses by name <subpass_name, reference>
     std::unordered_map<std::string, std::vector<VkAttachmentReference>> colorAttachmentReferences;
 
+    // Holds attachment references for depth attachments in subpasses by name <subpass_name, reference>
+    std::unordered_map<std::string, std::optional<VkAttachmentReference>> depthAttachmentReferences;
+
     // Holds attachment references for input attachments in subpasses by name <subpass_name, reference>
     std::unordered_map<std::string, std::vector<VkAttachmentReference>> inputAttachmentReferences;
 
@@ -53,30 +61,10 @@ GraphicsPass GraphicsPassBuilder::build() {
         // Keep track of where this subpass is in subpassDescriptions vector
         subpassLocations[subpassName] = subpassDescriptions.size();
 
-        // Process input attachments
-        for (const std::string &inputAttachmentName : subpassInfos_[subpassName].inputAttachmentNames_) {
-            Log::debug("  - Processing input attachment: %s", inputAttachmentName.c_str());
-
-            if constexpr (consts::DEBUG) {
-                if (attachmentLocations.find(inputAttachmentName) == attachmentLocations.end()) {
-                    Log::fatal("Input attachment '%s' was not added to the graphics pass", inputAttachmentName.c_str());
-                }
-            }
-
-            // Create an attachment reference for this input attachment
-            VkAttachmentReference reference = {};
-            reference.attachment = attachmentLocations[inputAttachmentName];
-            reference.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-            // Set the usage for this attachment
-            attachments_[inputAttachmentName].usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-
-            // Add it to the list of input attachments for this subpass
-            inputAttachmentReferences[subpassName].emplace_back(reference);
-        }
-
         // Process color attachments
         for (const std::string &colorAttachmentName : subpassInfos_[subpassName].colorAttachmentNames_) {
+            unreferencedAttachments.erase(colorAttachmentName);
+
             // Mark unused attachments as VK_ATTACHMENT_UNUSED and continue
             if (colorAttachmentName == GraphicsPass::UnusedName) {
                 VkAttachmentReference reference = {};
@@ -106,6 +94,55 @@ GraphicsPass GraphicsPassBuilder::build() {
             colorAttachmentReferences[subpassName].emplace_back(reference);
         }
 
+        // Process depth attachment
+        if (subpassInfos_[subpassName].depthAttachmentName_.has_value()) {
+            const auto &depthAttachmentName = subpassInfos_[subpassName].depthAttachmentName_.value();
+            unreferencedAttachments.erase(depthAttachmentName);
+
+            Log::debug("  - Processing depth attachment: %s", depthAttachmentName.c_str());
+
+            if constexpr (consts::DEBUG) {
+                if (attachmentLocations.find(depthAttachmentName) == attachmentLocations.end()) {
+                    Log::fatal("Depth attachment '%s' was not added to the graphics pass", depthAttachmentName.c_str());
+                }
+            }
+
+            // Create an attachment reference for this depth attachment
+            VkAttachmentReference reference = {};
+            reference.attachment = attachmentLocations[depthAttachmentName];
+            reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+            // Set the usage for this attachment
+            attachments_[depthAttachmentName].usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+            // Add it to the list of depth attachments for this subpass
+            depthAttachmentReferences[subpassName] = reference;
+        }
+
+        // Process input attachments
+        for (const std::string &inputAttachmentName : subpassInfos_[subpassName].inputAttachmentNames_) {
+            unreferencedAttachments.erase(inputAttachmentName);
+
+            Log::debug("  - Processing input attachment: %s", inputAttachmentName.c_str());
+
+            if constexpr (consts::DEBUG) {
+                if (attachmentLocations.find(inputAttachmentName) == attachmentLocations.end()) {
+                    Log::fatal("Input attachment '%s' was not added to the graphics pass", inputAttachmentName.c_str());
+                }
+            }
+
+            // Create an attachment reference for this input attachment
+            VkAttachmentReference reference = {};
+            reference.attachment = attachmentLocations[inputAttachmentName];
+            reference.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            // Set the usage for this attachment
+            attachments_[inputAttachmentName].usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+
+            // Add it to the list of input attachments for this subpass
+            inputAttachmentReferences[subpassName].emplace_back(reference);
+        }
+
         // Create the subpass description
         VkSubpassDescription subpassDescription = {};
         subpassDescription.flags = 0;
@@ -115,11 +152,26 @@ GraphicsPass GraphicsPassBuilder::build() {
         subpassDescription.colorAttachmentCount = (u32) colorAttachmentReferences[subpassName].size();
         subpassDescription.pColorAttachments = colorAttachmentReferences[subpassName].data();
         subpassDescription.pResolveAttachments = nullptr;
-        subpassDescription.pDepthStencilAttachment = nullptr;
+        if (depthAttachmentReferences[subpassName].has_value()) {
+            subpassDescription.pDepthStencilAttachment = &depthAttachmentReferences[subpassName].value();
+        }
         subpassDescription.preserveAttachmentCount = 0;
         subpassDescription.pPreserveAttachments = nullptr;
 
         subpassDescriptions.emplace_back(subpassDescription);
+    }
+
+    if constexpr (consts::DEBUG) {
+        if (!unreferencedAttachments.empty()) {
+            std::string errMsg = "%d attachment%s not referenced by any subpasses:";
+
+            for (const auto &unreferenced : unreferencedAttachments) {
+                errMsg += "\n- " + unreferenced;
+            }
+
+            Log::fatal(errMsg.c_str(), unreferencedAttachments.size(),
+                       unreferencedAttachments.size() == 1 ? " was" : "s were");
+        }
     }
 
     //--------------------------------------
@@ -212,7 +264,7 @@ GraphicsPass GraphicsPassBuilder::build() {
         subpasses.emplace_back(
             device_.createGraphicsPipeline(
                 subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass, subpasses.size(),
-                subpassInfo.colorAttachmentNames_.size()
+                subpassInfo.colorAttachmentNames_.size(), subpassInfo.depthAttachmentName_.has_value()
             ),
             layout,
             subpass_name
@@ -315,6 +367,19 @@ SubpassBuilder &SubpassBuilder::addColorAttachment(const std::string &attachment
 
     // Set the attachment
     names[location] = attachment_name;
+
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::addDepthAttachment(const std::string &attachment_name) {
+    if constexpr (consts::DEBUG) {
+        if (subpass_.depthAttachmentName_.has_value()) {
+            Log::fatal("Cannot add depth attachment '%s' to subpass because '%s' was already added",
+                       attachment_name.c_str(), subpass_.depthAttachmentName_.value().c_str());
+        }
+    }
+
+    subpass_.depthAttachmentName_ = attachment_name;
 
     return *this;
 }

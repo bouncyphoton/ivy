@@ -313,7 +313,7 @@ void RenderDevice::endFrame() {
     // Debug stats for this frame
     //----------------------------------
 
-    if (consts::DEBUG) {
+    if constexpr (consts::DEBUG) {
         Log::debug("+-- Frame stats for %d -----------", swapImageIndex_);
         Log::debug("| %d/%d bytes (%.2f%%) of the buffer were used for uniform buffers",
                    uniformBufferOffsets_[swapImageIndex_], uniformBufferSize_,
@@ -468,7 +468,8 @@ SubpassLayout RenderDevice::createLayout(const LayoutBindingsMap_t &layout_bindi
 
 VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shaders,
                                                 const VertexDescription &vertex_description, VkPipelineLayout layout,
-                                                VkRenderPass render_pass, u32 subpass, u32 num_color_attachments) {
+                                                VkRenderPass render_pass, u32 subpass, u32 num_color_attachments,
+                                                bool has_depth_attachment) {
     // Generate shader stages
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages(shaders.size());
     for (u32 i = 0; i < shaders.size(); ++i) {
@@ -531,12 +532,12 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     multisampleCreateInfo.alphaToCoverageEnable = VK_FALSE;
     multisampleCreateInfo.alphaToOneEnable = VK_FALSE;
 
-    // TODO: Depth/stencil, check renderpass
-    // VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
-    // depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    // depthStencilCreateInfo.depthTestEnable = VK_TRUE;
-    // depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
-    // depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+    // Depth create info
+    VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
+    depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencilCreateInfo.depthTestEnable = VK_TRUE;
+    depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
+    depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 
     // Color blending
     VkPipelineColorBlendAttachmentState blendState = {};
@@ -565,7 +566,7 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     ci.pViewportState = &viewportCreateInfo;
     ci.pRasterizationState = &rasterizationCreateInfo;
     ci.pMultisampleState = &multisampleCreateInfo;
-    // ci.pDepthStencilState = &depthStencilCreateInfo;
+    ci.pDepthStencilState = has_depth_attachment ? &depthStencilCreateInfo : nullptr;
     ci.pColorBlendState = &colorBlendCreateInfo;
     ci.pDynamicState = nullptr; // TODO: dynamic state
     ci.layout = layout;
