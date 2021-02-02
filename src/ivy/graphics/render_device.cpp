@@ -705,64 +705,15 @@ VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
         Log::fatal("Invalid vertex buffer size: %d", size);
     }
 
-    // Create our vertex buffer and memory
-    VkBufferCreateInfo vertexBufferCI = {};
-    vertexBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    vertexBufferCI.size = size;
-    vertexBufferCI.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    vertexBufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    return createBuffer(data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+}
 
-    VmaAllocationCreateInfo vertexAllocCI = {};
-    vertexAllocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-    VkBuffer vertexBuffer;
-    VmaAllocation vertexAllocation;
-    VmaAllocationInfo vertexAllocInfo;
-    VK_CHECKF(vmaCreateBuffer(allocator_, &vertexBufferCI, &vertexAllocCI, &vertexBuffer, &vertexAllocation,
-                              &vertexAllocInfo));
-    cleanupStack_.emplace([ = ]() {
-        vmaDestroyBuffer(allocator_, vertexBuffer, vertexAllocation);
-    });
-
-    VkMemoryPropertyFlags memFlags;
-    vmaGetMemoryTypeProperties(allocator_, vertexAllocInfo.memoryType, &memFlags);
-    if ((memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) {
-        // If the memory happens to be mappable, no need for staging buffer
-        void *mappedData;
-        vmaMapMemory(allocator_, vertexAllocation, &mappedData);
-        memcpy(mappedData, data, (size_t) size);
-        vmaUnmapMemory(allocator_, vertexAllocation);
-    } else {
-        // Otherwise, we need a staging buffer
-        VkBufferCreateInfo stagingBufferCI = {};
-        stagingBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        stagingBufferCI.size = size;
-        stagingBufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        stagingBufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        VmaAllocationCreateInfo stagingAllocCI = {};
-        stagingAllocCI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-        stagingAllocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-        VkBuffer stagingBuffer;
-        VmaAllocation stagingAllocation;
-        VmaAllocationInfo stagingAllocInfo;
-        VK_CHECKF(vmaCreateBuffer(allocator_, &stagingBufferCI, &stagingAllocCI, &stagingBuffer, &stagingAllocation,
-                                  &stagingAllocInfo));
-
-        // Copy data into staging buffer
-        memcpy(stagingAllocInfo.pMappedData, data, (size_t) size);
-
-        // Copy staging buffer into vertex buffer
-        submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
-            cmd.copyBuffer(vertexBuffer, stagingBuffer, size);
-        });
-
-        // Destroy staging buffer
-        vmaDestroyBuffer(allocator_, stagingBuffer, stagingAllocation);
+VkBuffer RenderDevice::createIndexBuffer(void *data, VkDeviceSize size) {
+    if (size <= 0) {
+        Log::fatal("Invalid index buffer size: %d", size);
     }
 
-    return vertexBuffer;
+    return createBuffer(data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 }
 
 VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set) {
@@ -1151,6 +1102,66 @@ void RenderDevice::createSwapchain() {
             vkDestroyImageView(device_, swapchainImageViews_[i], nullptr);
         });
     }
+}
+
+VkBuffer RenderDevice::createBuffer(void *data, VkDeviceSize size, VkBufferUsageFlagBits usage) {
+    // Create our buffer and memory
+    VkBufferCreateInfo bufferCI = {};
+    bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCI.size = size;
+    bufferCI.usage = usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocCI = {};
+    allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo allocInfo;
+    VK_CHECKF(vmaCreateBuffer(allocator_, &bufferCI, &allocCI, &buffer, &allocation, &allocInfo));
+    cleanupStack_.emplace([ = ]() {
+        vmaDestroyBuffer(allocator_, buffer, allocation);
+    });
+
+    VkMemoryPropertyFlags memFlags;
+    vmaGetMemoryTypeProperties(allocator_, allocInfo.memoryType, &memFlags);
+    if ((memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) {
+        // If the memory happens to be mappable, no need for staging buffer
+        void *mappedData;
+        vmaMapMemory(allocator_, allocation, &mappedData);
+        memcpy(mappedData, data, (size_t) size);
+        vmaUnmapMemory(allocator_, allocation);
+    } else {
+        // Otherwise, we need a staging buffer
+        VkBufferCreateInfo stagingBufferCI = {};
+        stagingBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        stagingBufferCI.size = size;
+        stagingBufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        stagingBufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo stagingAllocCI = {};
+        stagingAllocCI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+        stagingAllocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+        VkBuffer stagingBuffer;
+        VmaAllocation stagingAllocation;
+        VmaAllocationInfo stagingAllocInfo;
+        VK_CHECKF(vmaCreateBuffer(allocator_, &stagingBufferCI, &stagingAllocCI, &stagingBuffer, &stagingAllocation,
+                                  &stagingAllocInfo));
+
+        // Copy data into staging buffer
+        memcpy(stagingAllocInfo.pMappedData, data, (size_t) size);
+
+        // Copy staging buffer into vertex buffer
+        submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
+            cmd.copyBuffer(buffer, stagingBuffer, size);
+        });
+
+        // Destroy staging buffer
+        vmaDestroyBuffer(allocator_, stagingBuffer, stagingAllocation);
+    }
+
+    return buffer;
 }
 
 }

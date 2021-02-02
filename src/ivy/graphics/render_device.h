@@ -113,6 +113,14 @@ public:
     VkBuffer createVertexBuffer(void *data, VkDeviceSize size);
 
     /**
+     * \brief Create an index buffer (of u32s) with the lifetime of the render device
+     * \param data Pointer to index data
+     * \param size Size of index buffer in bytes
+     * \return VkBuffer
+     */
+    VkBuffer createIndexBuffer(void *data, VkDeviceSize size);
+
+    /**
      * \brief Get a VkDescriptorSet with data specified in set for a graphics pass for the current frame
      * \param pass The associated graphics pass
      * \param set The set
@@ -130,6 +138,15 @@ private:
      * \brief Create the swapchain and images for swapchain
      */
     void createSwapchain();
+
+    /**
+     * \brief Create a buffer on the GPU with the lifetime of the render device
+     * \param data Pointer to the data
+     * \param size Size of the buffer in bytes
+     * \param usage How the buffer will be used
+     * \return VkBuffer
+     */
+    VkBuffer createBuffer(void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
 
     const Options options_;
 

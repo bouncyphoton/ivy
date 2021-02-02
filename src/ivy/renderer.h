@@ -26,6 +26,7 @@ private:
     gfx::RenderDevice device_;
     std::vector<gfx::GraphicsPass> passes_;
     VkBuffer vertexBuffer_;
+    VkBuffer indexBuffer_;
 };
 
 }

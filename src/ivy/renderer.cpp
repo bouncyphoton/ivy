@@ -10,7 +10,7 @@ namespace ivy {
 // TODO: multiple render passes
 
 // TODO: remove temp vertices
-gfx::VertexP3C3 cube[] = {
+gfx::VertexP3C3 vertices[] = {
     gfx::VertexP3C3({-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}),
     gfx::VertexP3C3({ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}),
     gfx::VertexP3C3({-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}),
@@ -22,14 +22,13 @@ gfx::VertexP3C3 cube[] = {
     gfx::VertexP3C3({ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}),
 };
 
-// TODO: index buffer
-gfx::VertexP3C3 vertices[] = {
-    cube[0], cube[1], cube[2], cube[2], cube[1], cube[3],
-    cube[2], cube[3], cube[4], cube[4], cube[3], cube[5],
-    cube[4], cube[5], cube[6], cube[6], cube[5], cube[7],
-    cube[6], cube[7], cube[0], cube[0], cube[7], cube[1],
-    cube[1], cube[7], cube[3], cube[3], cube[7], cube[5],
-    cube[6], cube[0], cube[4], cube[4], cube[0], cube[2],
+u32 indices[] = {
+    0, 1, 2, 2, 1, 3,
+    2, 3, 4, 4, 3, 5,
+    4, 5, 6, 6, 5, 7,
+    6, 7, 0, 0, 7, 1,
+    1, 7, 3, 3, 7, 5,
+    6, 0, 4, 4, 0, 2
 };
 
 struct MVP {
@@ -89,6 +88,7 @@ Renderer::Renderer(const Options &options, const Platform &platform)
 
     // Create vertex buffer
     vertexBuffer_ = device_.createVertexBuffer(vertices, sizeof(vertices[0]) * COUNTOF(vertices));
+    indexBuffer_ = device_.createIndexBuffer(indices, sizeof(indices[0]) * COUNTOF(indices));
 }
 
 Renderer::~Renderer() {
@@ -120,8 +120,10 @@ void Renderer::render() {
             cmd.setDescriptorSet(device_, pass, mvpSet);
 
             // Bind vertex buffer and draw
+            // TODO: would it make sense to compress these down into one command? like draw(vertexBuffer, ...)
             cmd.bindVertexBuffer(vertexBuffer_);
-            cmd.draw(COUNTOF(vertices), 1, 0, 0);
+            cmd.bindIndexBuffer(indexBuffer_);
+            cmd.drawIndexed(COUNTOF(indices), 1, 0, 0, 0);
         }
 
         // Subpass 1, lighting
