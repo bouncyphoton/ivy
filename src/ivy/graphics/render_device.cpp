@@ -700,7 +700,7 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
     return framebuffers_[renderPass][swapImageIndex_];
 }
 
-VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
+VkBuffer RenderDevice::createVertexBuffer(const void *data, VkDeviceSize size) {
     if (size <= 0) {
         Log::fatal("Invalid vertex buffer size: %d", size);
     }
@@ -708,7 +708,7 @@ VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
     return createBuffer(data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 }
 
-VkBuffer RenderDevice::createIndexBuffer(void *data, VkDeviceSize size) {
+VkBuffer RenderDevice::createIndexBuffer(const void *data, VkDeviceSize size) {
     if (size <= 0) {
         Log::fatal("Invalid index buffer size: %d", size);
     }
@@ -1104,7 +1104,7 @@ void RenderDevice::createSwapchain() {
     }
 }
 
-VkBuffer RenderDevice::createBuffer(void *data, VkDeviceSize size, VkBufferUsageFlagBits usage) {
+VkBuffer RenderDevice::createBuffer(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage) {
     // Create our buffer and memory
     VkBufferCreateInfo bufferCI = {};
     bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;

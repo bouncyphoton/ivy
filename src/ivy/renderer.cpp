@@ -10,7 +10,7 @@ namespace ivy {
 // TODO: multiple render passes
 
 // TODO: remove temp vertices
-gfx::VertexP3C3 vertices[] = {
+static std::vector<gfx::VertexP3C3> vertices = {
     gfx::VertexP3C3({-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}),
     gfx::VertexP3C3({ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}),
     gfx::VertexP3C3({-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}),
@@ -22,7 +22,7 @@ gfx::VertexP3C3 vertices[] = {
     gfx::VertexP3C3({ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}),
 };
 
-u32 indices[] = {
+static std::vector<u32> indices = {
     0, 1, 2, 2, 1, 3,
     2, 3, 4, 4, 3, 5,
     4, 5, 6, 6, 5, 7,
@@ -38,7 +38,7 @@ struct MVP {
 };
 
 Renderer::Renderer(const Options &options, const Platform &platform)
-    : device_(options, platform) {
+    : device_(options, platform), mesh_(device_, vertices, indices) {
     LOG_CHECKPOINT();
 
     // TODO: make it nicer to add a depth attachment
@@ -85,10 +85,6 @@ Renderer::Renderer(const Options &options, const Platform &platform)
                               VK_ACCESS_SHADER_READ_BIT)
         .build()
     );
-
-    // Create vertex buffer
-    vertexBuffer_ = device_.createVertexBuffer(vertices, sizeof(vertices[0]) * COUNTOF(vertices));
-    indexBuffer_ = device_.createIndexBuffer(indices, sizeof(indices[0]) * COUNTOF(indices));
 }
 
 Renderer::~Renderer() {
@@ -119,11 +115,8 @@ void Renderer::render() {
             mvpSet.setUniformBuffer(0, mvpData);
             cmd.setDescriptorSet(device_, pass, mvpSet);
 
-            // Bind vertex buffer and draw
-            // TODO: would it make sense to compress these down into one command? like draw(vertexBuffer, ...)
-            cmd.bindVertexBuffer(vertexBuffer_);
-            cmd.bindIndexBuffer(indexBuffer_);
-            cmd.drawIndexed(COUNTOF(indices), 1, 0, 0, 0);
+            // Draw our mesh
+            mesh_.draw(cmd);
         }
 
         // Subpass 1, lighting

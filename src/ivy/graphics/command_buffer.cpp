@@ -86,7 +86,8 @@ void CommandBuffer::draw(u32 num_vertices, u32 num_instances, u32 first_vertex, 
     vkCmdDraw(commandBuffer_, num_vertices, num_instances, first_vertex, first_instance);
 }
 
-void CommandBuffer::drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset, u32 first_instance) {
+void CommandBuffer::drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset,
+                                u32 first_instance) {
     vkCmdDrawIndexed(commandBuffer_, num_indices, num_instances, first_index, vertex_offset, first_instance);
 }
 

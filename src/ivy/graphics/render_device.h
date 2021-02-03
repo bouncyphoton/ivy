@@ -110,7 +110,7 @@ public:
      * \param size Size of vertex data in bytes
      * \return VkBuffer
      */
-    VkBuffer createVertexBuffer(void *data, VkDeviceSize size);
+    VkBuffer createVertexBuffer(const void *data, VkDeviceSize size);
 
     /**
      * \brief Create an index buffer (of u32s) with the lifetime of the render device
@@ -118,7 +118,7 @@ public:
      * \param size Size of index buffer in bytes
      * \return VkBuffer
      */
-    VkBuffer createIndexBuffer(void *data, VkDeviceSize size);
+    VkBuffer createIndexBuffer(const void *data, VkDeviceSize size);
 
     /**
      * \brief Get a VkDescriptorSet with data specified in set for a graphics pass for the current frame
@@ -146,7 +146,7 @@ private:
      * \param usage How the buffer will be used
      * \return VkBuffer
      */
-    VkBuffer createBuffer(void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
+    VkBuffer createBuffer(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
 
     const Options options_;
 
