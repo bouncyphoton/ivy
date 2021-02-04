@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include "ivy/log.h"
 #include "ivy/graphics/vertex.h"
+#include "ivy/entity/components/transform.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <GLFW/glfw3.h>
 
@@ -85,6 +86,12 @@ Renderer::Renderer(const Options &options, const Platform &platform)
                               VK_ACCESS_SHADER_READ_BIT)
         .build()
     );
+
+    // TEMP
+    for (u32 i = 0; i < 10; ++i) {
+        entities_.emplace_back();
+        entities_.back().setComponent<Transform>();
+    }
 }
 
 Renderer::~Renderer() {
@@ -104,19 +111,36 @@ void Renderer::render() {
             // Bind graphics pipeline
             cmd.bindGraphicsPipeline(pass, subpassIdx);
 
+            // TODO: it would make sense to separate per-frame and per-draw descriptor sets
+
             // Set MVP data on CPU
             MVP mvpData = {};
-            mvpData.proj = glm::perspective(glm::half_pi<f32>(), 800.0f / 600.0f, 0.01f, 100.0f);
-            mvpData.view = glm::lookAt(glm::vec3(0, 1, 2), glm::vec3(0), glm::vec3(0, 1, 0));
-            mvpData.model = glm::rotate(glm::mat4(1), (f32) glfwGetTime(), glm::vec3(0, 1, 0));
+            mvpData.proj = glm::perspective(glm::half_pi<f32>(), 800.0f / 600.0f, 0.1f, 100.0f);
+            mvpData.view = glm::lookAt(glm::vec3(0, 1, 5), glm::vec3(0), glm::vec3(0, 1, 0));
 
-            // Put MVP data in a descriptor set and bind it
-            gfx::DescriptorSet mvpSet(pass, subpassIdx, 0);
-            mvpSet.setUniformBuffer(0, mvpData);
-            cmd.setDescriptorSet(device_, pass, mvpSet);
+            for (u32 i = 0; i < entities_.size(); ++i) {
+                const Entity &entity = entities_[i];
 
-            // Draw our mesh
-            mesh_.draw(cmd);
+                if (Transform *transform = entity.getComponent<Transform>()) {
+                    // Update the position for this entity
+                    f32 time = (f32) glfwGetTime();
+                    f32 x = i - entities_.size() * 0.5f + 0.5f;
+                    transform->setPosition(glm::vec3(x, sinf(x + time), 0));
+                    transform->setOrientation(glm::vec3(0, time, 0));
+                    transform->setScale(glm::vec3(cosf(x + time) * 0.5f + 0.5f));
+
+                    // Set the model matrix
+                    mvpData.model = transform->getModelMatrix();
+
+                    // Put MVP data in a descriptor set and bind it
+                    gfx::DescriptorSet mvpSet(pass, subpassIdx, 0);
+                    mvpSet.setUniformBuffer(0, mvpData);
+                    cmd.setDescriptorSet(device_, pass, mvpSet);
+
+                    // Draw our mesh
+                    mesh_.draw(cmd);
+                }
+            }
         }
 
         // Subpass 1, lighting

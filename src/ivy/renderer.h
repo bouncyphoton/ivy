@@ -5,6 +5,7 @@
 #include "ivy/graphics/graphics_pass.h"
 #include "ivy/graphics/vertex.h"
 #include "ivy/graphics/mesh.h"
+#include "ivy/entity/entity.h"
 
 namespace ivy {
 
@@ -27,6 +28,10 @@ public:
 private:
     gfx::RenderDevice device_;
     std::vector<gfx::GraphicsPass> passes_;
+
+    // TODO: remove temp entities in renderer
+    std::vector<Entity> entities_;
+
     gfx::MeshStatic<gfx::VertexP3C3> mesh_;
 };
 
