@@ -34,7 +34,8 @@ void Engine::run() {
     for (u32 i = 0; i < 10; ++i) {
         entities.emplace_back();
         entities.back().setComponent<Transform>();
-        entities.back().setComponent<Mesh>(resourceManager.getMesh("models/bunny.obj"));
+        entities.back().setComponent<Mesh>(resourceManager.getMesh(
+                i % 2 == 0 ? "models/bunny.obj" : "cube"));
     }
 
     // Main loop

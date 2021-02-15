@@ -13,8 +13,7 @@ namespace ivy::gfx {
  */
 class Geometry {
 public:
-    template<typename T>
-    Geometry(RenderDevice &device, const std::vector<T> &vertices, const std::vector<u32> &indices)
+    template<typename T> Geometry(RenderDevice &device, const std::vector<T> &vertices, const std::vector<u32> &indices)
         : numVertices_(vertices.size()), numIndices_(indices.size()) {
         // Create vertex and index buffers
         vertexBuffer_ = device.createVertexBuffer(vertices.data(), sizeof(vertices[0]) * numVertices_);

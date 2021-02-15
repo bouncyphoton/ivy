@@ -26,6 +26,11 @@ target_include_directories(ivy PRIVATE ${VMA_SRC})
 target_include_directories(ivy PRIVATE external/glm)
 add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
+# Assimp
+set(BUILD_SHARED_LIBS off)
+add_subdirectory(external/assimp)
+target_link_libraries(ivy assimp)
+
 # Set compile options
 if (MSVC)
     # Treat warnings as errors
