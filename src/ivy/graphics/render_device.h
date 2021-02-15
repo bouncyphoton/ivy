@@ -64,6 +64,14 @@ public:
     }
 
     /**
+     * \brief Get the extent of thevswapchain
+     * \return Swapchain extent
+     */
+    [[nodiscard]] VkExtent2D getSwapchainExtent() const {
+        return swapchainExtent_;
+    }
+
+    /**
      * \brief Create a render pass
      * \param attachments A vector of attachments
      * \param subpasses A vector of subpasses that use attachments

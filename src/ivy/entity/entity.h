@@ -1,6 +1,7 @@
 #ifndef IVY_ENTITY_H
 #define IVY_ENTITY_H
 
+#include "ivy/entity/components/component.h"
 #include <unordered_map>
 #include <memory>
 #include <typeindex>
@@ -42,7 +43,7 @@ public:
     void removeComponent();
 
 private:
-    std::unordered_map<std::type_index, std::shared_ptr<void>> components_;
+    std::unordered_map<std::type_index, std::unique_ptr<Component>> components_;
 };
 
 }

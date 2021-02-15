@@ -2,35 +2,13 @@
 #include "ivy/log.h"
 #include "ivy/graphics/vertex.h"
 #include "ivy/entity/components/transform.h"
+#include "ivy/entity/components/mesh.h"
 #include <glm/gtc/matrix_transform.hpp>
-#include <GLFW/glfw3.h>
 
 namespace ivy {
 
 // TODO: textures
 // TODO: multiple render passes
-
-// TODO: remove temp vertices
-static std::vector<gfx::VertexP3C3> vertices = {
-    gfx::VertexP3C3({-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}),
-    gfx::VertexP3C3({ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}),
-    gfx::VertexP3C3({-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}),
-    gfx::VertexP3C3({ 0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 0.0f}),
-
-    gfx::VertexP3C3({-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}),
-    gfx::VertexP3C3({ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}),
-    gfx::VertexP3C3({-0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}),
-    gfx::VertexP3C3({ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}),
-};
-
-static std::vector<u32> indices = {
-    0, 1, 2, 2, 1, 3,
-    2, 3, 4, 4, 3, 5,
-    4, 5, 6, 6, 5, 7,
-    6, 7, 0, 0, 7, 1,
-    1, 7, 3, 3, 7, 5,
-    6, 0, 4, 4, 0, 2
-};
 
 struct MVP {
     alignas(16) glm::mat4 proj;
@@ -38,8 +16,8 @@ struct MVP {
     alignas(16) glm::mat4 model;
 };
 
-Renderer::Renderer(const Options &options, const Platform &platform)
-    : device_(options, platform), mesh_(device_, vertices, indices) {
+Renderer::Renderer(gfx::RenderDevice &render_device)
+    : device_(render_device) {
     LOG_CHECKPOINT();
 
     // TODO: make it nicer to add a depth attachment
@@ -86,19 +64,13 @@ Renderer::Renderer(const Options &options, const Platform &platform)
                               VK_ACCESS_SHADER_READ_BIT)
         .build()
     );
-
-    // TEMP
-    for (u32 i = 0; i < 10; ++i) {
-        entities_.emplace_back();
-        entities_.back().setComponent<Transform>();
-    }
 }
 
 Renderer::~Renderer() {
     LOG_CHECKPOINT();
 }
 
-void Renderer::render() {
+void Renderer::render(const std::vector<Entity> &entities) {
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
     gfx::GraphicsPass &pass = passes_.front();
@@ -112,23 +84,19 @@ void Renderer::render() {
             cmd.bindGraphicsPipeline(pass, subpassIdx);
 
             // TODO: it would make sense to separate per-frame and per-draw descriptor sets
+            // TODO: get aspect ratio for output attachment
+            f32 aspectRatio = device_.getSwapchainExtent().width / (f32) device_.getSwapchainExtent().height;
 
             // Set MVP data on CPU
             MVP mvpData = {};
-            mvpData.proj = glm::perspective(glm::half_pi<f32>(), 800.0f / 600.0f, 0.1f, 100.0f);
+            mvpData.proj = glm::perspective(glm::half_pi<f32>(), aspectRatio, 0.1f, 100.0f);
             mvpData.view = glm::lookAt(glm::vec3(0, 1, 5), glm::vec3(0), glm::vec3(0, 1, 0));
 
-            for (u32 i = 0; i < entities_.size(); ++i) {
-                const Entity &entity = entities_[i];
+            for (const auto &entity : entities) {
+                Transform *transform = entity.getComponent<Transform>();
+                Mesh *mesh           = entity.getComponent<Mesh>();
 
-                if (Transform *transform = entity.getComponent<Transform>()) {
-                    // Update the position for this entity
-                    f32 time = (f32) glfwGetTime();
-                    f32 x = i - entities_.size() * 0.5f + 0.5f;
-                    transform->setPosition(glm::vec3(x, sinf(x + time), 0));
-                    transform->setOrientation(glm::vec3(0, time, 0));
-                    transform->setScale(glm::vec3(cosf(x + time) * 0.5f + 0.5f));
-
+                if (transform && mesh) {
                     // Set the model matrix
                     mvpData.model = transform->getModelMatrix();
 
@@ -138,7 +106,7 @@ void Renderer::render() {
                     cmd.setDescriptorSet(device_, pass, mvpSet);
 
                     // Draw our mesh
-                    mesh_.draw(cmd);
+                    mesh->draw(cmd);
                 }
             }
         }

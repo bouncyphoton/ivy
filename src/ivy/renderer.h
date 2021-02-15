@@ -4,7 +4,7 @@
 #include "ivy/graphics/render_device.h"
 #include "ivy/graphics/graphics_pass.h"
 #include "ivy/graphics/vertex.h"
-#include "ivy/graphics/mesh.h"
+#include "ivy/graphics/geometry.h"
 #include "ivy/entity/entity.h"
 
 namespace ivy {
@@ -17,22 +17,17 @@ class Platform;
  */
 class Renderer final {
 public:
-    explicit Renderer(const Options &options, const Platform &platform);
+    explicit Renderer(gfx::RenderDevice &render_device);
     ~Renderer();
 
     /**
      * \brief Render a frame
      */
-    void render();
+    void render(const std::vector<Entity> &entities);
 
 private:
-    gfx::RenderDevice device_;
+    gfx::RenderDevice &device_;
     std::vector<gfx::GraphicsPass> passes_;
-
-    // TODO: remove temp entities in renderer
-    std::vector<Entity> entities_;
-
-    gfx::MeshStatic<gfx::VertexP3C3> mesh_;
 };
 
 }

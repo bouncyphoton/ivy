@@ -1,13 +1,17 @@
 #ifndef IVY_TRANSFORM_H
 #define IVY_TRANSFORM_H
 
+#include "ivy/entity/components/component.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 namespace ivy {
 
-class Transform {
+/**
+ * \brief Entity component with transformation data
+ */
+class Transform : public Component {
 public:
     explicit Transform(glm::vec3 position = glm::vec3(0),
                        glm::quat orientation = glm::vec3(0),
