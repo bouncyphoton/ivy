@@ -42,7 +42,16 @@ public:
     template <typename T>
     void removeComponent();
 
+    void setTag(const std::string &tag) {
+        tag_ = tag;
+    }
+
+    bool hasTag(const std::string &tag) const {
+        return tag_ == tag;
+    }
+
 private:
+    std::string tag_;
     std::unordered_map<std::type_index, std::unique_ptr<Component>> components_;
 };
 

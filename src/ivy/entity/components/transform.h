@@ -36,6 +36,18 @@ public:
         return scale_;
     }
 
+    [[nodiscard]] glm::vec3 getForward() const {
+        return orientation_ * FORWARD;
+    }
+
+    [[nodiscard]] glm::vec3 getUp() const {
+        return orientation_ * UP;
+    }
+
+    [[nodiscard]] glm::vec3 getRight() const {
+        return orientation_ * RIGHT;
+    }
+
     void setPosition(glm::vec3 position) {
         position_ = position;
     }
@@ -47,6 +59,14 @@ public:
     void setScale(glm::vec3 scale) {
         scale_ = scale;
     }
+
+    void addPosition(glm::vec3 position) {
+        position_ += position;
+    }
+
+    constexpr static glm::vec3 FORWARD = glm::vec3(0, 0, -1);
+    constexpr static glm::vec3 UP = glm::vec3(0, 1, 0);
+    constexpr static glm::vec3 RIGHT = glm::vec3(1, 0, 0);
 
 private:
     glm::vec3 position_;

@@ -3,6 +3,7 @@
 #include "ivy/graphics/vertex.h"
 #include "ivy/entity/components/transform.h"
 #include "ivy/entity/components/model.h"
+#include "ivy/entity/components/camera.h"
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace ivy {
@@ -90,9 +91,24 @@ void Renderer::render(const std::vector<Entity> &entities) {
 
             // Set MVP data on CPU
             MVP mvpData = {};
-            mvpData.proj = glm::perspective(glm::half_pi<f32>(), aspectRatio, 0.1f, 100.0f);
-            mvpData.view = glm::lookAt(glm::vec3(0, 1, 5), glm::vec3(0), glm::vec3(0, 1, 0));
+            mvpData.proj = glm::mat4(1);
+            mvpData.view = glm::mat4(1);
 
+            // Set projection and view matrix from first entity with camera component
+            auto cameraIt = std::find_if(entities.begin(), entities.end(), [](const Entity & e) {
+                return e.getComponent<Camera>() && e.getComponent<Transform>();
+            });
+            if (cameraIt != entities.end()) {
+                Camera camera = *cameraIt->getComponent<Camera>();
+                Transform transform = *cameraIt->getComponent<Transform>();
+
+                mvpData.proj = glm::perspective(camera.getFovY(), aspectRatio, camera.getNearPlane(), camera.getFarPlane());
+                mvpData.view = glm::lookAt(transform.getPosition(), transform.getPosition() + transform.getForward(), Transform::UP);
+            } else {
+                Log::warn("No entities in the scene have a Camera and Transform component");
+            }
+
+            // Go over entities and draw
             for (const auto &entity : entities) {
                 Transform *transform = entity.getComponent<Transform>();
                 Model *model         = entity.getComponent<Model>();
