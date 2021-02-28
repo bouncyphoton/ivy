@@ -4,7 +4,7 @@
 #include "ivy/platform/platform.h"
 #include "ivy/graphics/render_device.h"
 #include "ivy/entity/components/transform.h"
-#include "ivy/entity/components/mesh.h"
+#include "ivy/entity/components/model.h"
 #include "ivy/resources/resource_manager.h"
 #include <GLFW/glfw3.h>
 
@@ -27,15 +27,17 @@ void Engine::run() {
     static Renderer renderer(renderDevice);
     static ResourceManager resourceManager(renderDevice, "../assets");
 
-    resourceManager.loadResource("models/bunny.obj");
-
     // TEMP
     std::vector<Entity> entities;
     for (u32 i = 0; i < 10; ++i) {
         entities.emplace_back();
         entities.back().setComponent<Transform>();
-        entities.back().setComponent<Mesh>(resourceManager.getMesh(
-                i % 2 == 0 ? "models/bunny.obj" : "cube"));
+        entities.back().setComponent<Model>(resourceManager.getModel("models/bunny.obj"));
+    }
+    {
+        entities.emplace_back();
+        entities.back().setComponent<Transform>();
+        entities.back().setComponent<Model>(resourceManager.getModel("models/sponza/sponza.obj"));
     }
 
     // Main loop
@@ -44,7 +46,7 @@ void Engine::run() {
         platform.update();
 
         // Update entity transforms
-        for (u32 i = 0; i < entities.size(); ++i) {
+        for (u32 i = 0; i < entities.size() - 1; ++i) {
             const Entity &entity = entities[i];
 
             if (Transform *transform = entity.getComponent<Transform>()) {

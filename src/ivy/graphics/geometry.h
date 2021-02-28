@@ -20,7 +20,7 @@ public:
         indexBuffer_ = device.createIndexBuffer(indices.data(), sizeof(indices[0]) * numIndices_);
     }
 
-    void draw(CommandBuffer &cmd);
+    void draw(CommandBuffer &cmd) const;
 
 private:
     u32 numVertices_;

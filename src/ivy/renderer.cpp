@@ -2,13 +2,14 @@
 #include "ivy/log.h"
 #include "ivy/graphics/vertex.h"
 #include "ivy/entity/components/transform.h"
-#include "ivy/entity/components/mesh.h"
+#include "ivy/entity/components/model.h"
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace ivy {
 
 // TODO: textures
 // TODO: multiple render passes
+// TODO: compute pass
 
 struct MVP {
     alignas(16) glm::mat4 proj;
@@ -94,9 +95,9 @@ void Renderer::render(const std::vector<Entity> &entities) {
 
             for (const auto &entity : entities) {
                 Transform *transform = entity.getComponent<Transform>();
-                Mesh *mesh           = entity.getComponent<Mesh>();
+                Model *model         = entity.getComponent<Model>();
 
-                if (transform && mesh) {
+                if (transform && model) {
                     // Set the model matrix
                     mvpData.model = transform->getModelMatrix();
 
@@ -105,8 +106,8 @@ void Renderer::render(const std::vector<Entity> &entities) {
                     mvpSet.setUniformBuffer(0, mvpData);
                     cmd.setDescriptorSet(device_, pass, mvpSet);
 
-                    // Draw our mesh
-                    mesh->draw(cmd);
+                    // Draw our model
+                    model->draw(cmd);
                 }
             }
         }
