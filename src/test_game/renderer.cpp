@@ -6,11 +6,11 @@
 #include "ivy/entity/components/camera.h"
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace ivy {
-
 // TODO: textures
 // TODO: multiple render passes
 // TODO: compute pass
+
+using namespace ivy;
 
 struct MVP {
     alignas(16) glm::mat4 proj;
@@ -148,6 +148,4 @@ void Renderer::render(const std::vector<Entity> &entities) {
     });
 
     device_.endFrame();
-}
-
 }

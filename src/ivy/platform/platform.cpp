@@ -5,11 +5,11 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
     (void)scancode;
     (void)mods;
 
-    ivy::InputState *input = static_cast<ivy::InputState*>(glfwGetWindowUserPointer(window));
+    ivy::InputState *input = static_cast<ivy::InputState *>(glfwGetWindowUserPointer(window));
 
     if (action == GLFW_PRESS) {
         input->pressKey(key);

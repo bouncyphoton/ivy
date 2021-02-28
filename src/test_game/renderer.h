@@ -7,29 +7,22 @@
 #include "ivy/graphics/geometry.h"
 #include "ivy/entity/entity.h"
 
-namespace ivy {
-
-struct Options;
-class Platform;
-
 /**
  * \brief High level renderer
  */
 class Renderer final {
 public:
-    explicit Renderer(gfx::RenderDevice &render_device);
+    explicit Renderer(ivy::gfx::RenderDevice &render_device);
     ~Renderer();
 
     /**
      * \brief Render a frame
      */
-    void render(const std::vector<Entity> &entities);
+    void render(const std::vector<ivy::Entity> &entities);
 
 private:
-    gfx::RenderDevice &device_;
-    std::vector<gfx::GraphicsPass> passes_;
+    ivy::gfx::RenderDevice &device_;
+    std::vector<ivy::gfx::GraphicsPass> passes_;
 };
-
-}
 
 #endif // IVY_RENDERER_H
