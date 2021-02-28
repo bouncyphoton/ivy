@@ -14,13 +14,13 @@ namespace ivy {
 class Transform : public Component {
 public:
     explicit Transform(glm::vec3 position = glm::vec3(0),
-                       glm::quat orientation = glm::vec3(0),
+                       glm::vec3 rotation = glm::vec3(0),
                        glm::vec3 scale = glm::vec3(1))
-        : position_(position), orientation_(orientation), scale_(scale) {}
+        : position_(position), rotation_(rotation), scale_(scale) {}
 
     [[nodiscard]] glm::mat4 getModelMatrix() const {
         return glm::translate(glm::mat4(1), position_) *
-               glm::mat4_cast(orientation_) *
+               glm::mat4_cast(getOrientation()) *
                glm::scale(glm::mat4(1), scale_);
     }
 
@@ -29,7 +29,11 @@ public:
     }
 
     [[nodiscard]] glm::quat getOrientation() const {
-        return orientation_;
+        return glm::quat(getRotation());
+    }
+
+    [[nodiscard]] glm::vec3 getRotation() const {
+        return rotation_;
     }
 
     [[nodiscard]] glm::vec3 getScale() const {
@@ -37,15 +41,15 @@ public:
     }
 
     [[nodiscard]] glm::vec3 getForward() const {
-        return orientation_ * FORWARD;
+        return getOrientation() * FORWARD;
     }
 
     [[nodiscard]] glm::vec3 getUp() const {
-        return orientation_ * UP;
+        return getOrientation() * UP;
     }
 
     [[nodiscard]] glm::vec3 getRight() const {
-        return orientation_ * RIGHT;
+        return getOrientation() * RIGHT;
     }
 
     void setPosition(glm::vec3 position) {
@@ -53,7 +57,15 @@ public:
     }
 
     void setOrientation(glm::quat orientation) {
-        orientation_ = orientation;
+        setRotation(glm::eulerAngles(orientation));
+    }
+
+    void setRotation(glm::vec3 rotation) {
+        rotation_ = glm::mod(rotation, glm::vec3(glm::two_pi<f32>()));
+    }
+
+    void addRotation(glm::vec3 rotation) {
+        setRotation(getRotation() + rotation);
     }
 
     void setScale(glm::vec3 scale) {
@@ -61,16 +73,16 @@ public:
     }
 
     void addPosition(glm::vec3 position) {
-        position_ += position;
+        setPosition(getPosition() + position);
     }
 
     constexpr static glm::vec3 FORWARD = glm::vec3(0, 0, -1);
-    constexpr static glm::vec3 UP = glm::vec3(0, 1, 0);
-    constexpr static glm::vec3 RIGHT = glm::vec3(1, 0, 0);
+    constexpr static glm::vec3 UP      = glm::vec3(0, 1, 0);
+    constexpr static glm::vec3 RIGHT   = glm::vec3(1, 0, 0);
 
 private:
     glm::vec3 position_;
-    glm::quat orientation_;
+    glm::vec3 rotation_;
     glm::vec3 scale_;
 };
 
