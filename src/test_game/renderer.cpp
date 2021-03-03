@@ -22,8 +22,8 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
     : device_(render_device) {
     LOG_CHECKPOINT();
 
-    // TODO: make it nicer to add a depth attachment
     // TODO: search for supported depth attachments
+    // TODO: shader files should be a part of resource manager
 
     // Build our graphics pass
     passes_.emplace_back(
@@ -31,9 +31,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
         .addAttachmentSwapchain()
         .addAttachment("albedo", VK_FORMAT_R8G8B8A8_UNORM)
         .addAttachment("position", VK_FORMAT_R16G16B16A16_SFLOAT)
-        .addAttachment("depth", VK_FORMAT_D32_SFLOAT_S8_UINT, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE,
-                       VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_IMAGE_LAYOUT_UNDEFINED,
-                       VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL)
+        .addAttachment("depth", VK_FORMAT_D32_SFLOAT_S8_UINT)
         .addSubpass("gbuffer_pass",
                     gfx::SubpassBuilder()
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/gbuffer.vert.spv")

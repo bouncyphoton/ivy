@@ -243,6 +243,14 @@ public:
         : device_(device) {}
 
     /**
+     * \brief Add an attachment to the graphics pass. Load and store ops as well as final layout are deduced from format
+     * \param attachment_name The name of the attachment
+     * \param format The format of the attachment
+     * \return GraphicsPassBuilder
+     */
+    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format);
+
+    /**
      * \brief Add an attachment to the graphics pass
      * \param attachment_name The name of the attachment
      * \param format The format of the attachment
@@ -255,12 +263,9 @@ public:
      * \return GraphicsPassBuilder
      */
     GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format,
-                                       VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                       VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE,
-                                       VkAttachmentLoadOp stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                       VkAttachmentStoreOp stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                       VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-                                       VkImageLayout final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                       VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
+                                       VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op,
+                                       VkImageLayout initial_layout, VkImageLayout final_layout);
 
     /**
      * \brief Add an attachment to reference the swapchain

@@ -275,6 +275,30 @@ GraphicsPass GraphicsPassBuilder::build() {
     return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts);
 }
 
+GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format) {
+    bool isDepth = format >= VK_FORMAT_D16_UNORM && format <= VK_FORMAT_D32_SFLOAT_S8_UINT && format != VK_FORMAT_S8_UINT;
+    bool isStencil = format >= VK_FORMAT_S8_UINT && format <= VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+    VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE;
+    VkAttachmentLoadOp stencil_load_op = isStencil ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    VkAttachmentStoreOp stencil_store_op = isStencil ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkImageLayout final_layout;
+    if (isDepth && isStencil) {
+        final_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    } else if (isDepth) {
+        final_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+    } else if (isStencil) {
+        final_layout = VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL;
+    } else {
+        final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    }
+
+    return addAttachment(attachment_name, format, load_op, store_op, stencil_load_op, stencil_store_op,
+                         initial_layout, final_layout);
+}
+
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,
                                                         VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
                                                         VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op,
