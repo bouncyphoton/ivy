@@ -136,6 +136,16 @@ public:
      */
     VkDescriptorSet getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set);
 
+    /**
+     * \brief From a list, get the first format that is supported by the device with given features
+     * \param formats List of formats to check
+     * \param feature The feature flag bits to check
+     * \param tiling The tiling
+     * \return First valid format from list or VK_FORMAT_UNDEFINED if none are valid
+     */
+    VkFormat getFirstSupportedFormat(const std::vector<VkFormat> &formats, VkFormatFeatureFlagBits feature,
+                                     VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
+
 private:
     /**
      * \brief Choose a physical device

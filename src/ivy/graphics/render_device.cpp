@@ -833,6 +833,21 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     return dstSet;
 }
 
+VkFormat RenderDevice::getFirstSupportedFormat(const std::vector<VkFormat> &formats,
+                                               VkFormatFeatureFlagBits feature, VkImageTiling tiling) {
+    for (VkFormat format : formats) {
+        VkFormatProperties properties;
+        vkGetPhysicalDeviceFormatProperties(physicalDevice_, format, &properties);
+
+        if ((tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & feature) == feature) ||
+            (tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & feature) == feature)) {
+            return format;
+        }
+    }
+
+    return VK_FORMAT_UNDEFINED;
+}
+
 void RenderDevice::choosePhysicalDevice() {
     u32 numPhysicalDevices;
     VK_CHECKF(vkEnumeratePhysicalDevices(instance_, &numPhysicalDevices, nullptr));

@@ -276,6 +276,7 @@ GraphicsPass GraphicsPassBuilder::build() {
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format) {
+    bool separateDepthStencilLayoutsEnabled = false;
     bool isDepth = format >= VK_FORMAT_D16_UNORM && format <= VK_FORMAT_D32_SFLOAT_S8_UINT && format != VK_FORMAT_S8_UINT;
     bool isStencil = format >= VK_FORMAT_S8_UINT && format <= VK_FORMAT_D32_SFLOAT_S8_UINT;
 
@@ -285,9 +286,9 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attac
     VkAttachmentStoreOp stencil_store_op = isStencil ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageLayout final_layout;
-    if (isDepth && isStencil) {
+    if ((isDepth && isStencil) || (isDepth && !separateDepthStencilLayoutsEnabled)) {
         final_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-    } else if (isDepth) {
+    } else if (isDepth && separateDepthStencilLayoutsEnabled) {
         final_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
     } else if (isStencil) {
         final_layout = VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL;
