@@ -64,6 +64,14 @@ public:
     }
 
     /**
+     * \brief Get the extent of thevswapchain
+     * \return Swapchain extent
+     */
+    [[nodiscard]] VkExtent2D getSwapchainExtent() const {
+        return swapchainExtent_;
+    }
+
+    /**
      * \brief Create a render pass
      * \param attachments A vector of attachments
      * \param subpasses A vector of subpasses that use attachments
@@ -89,11 +97,13 @@ public:
      * \param layout Pipeline layout
      * \param render_pass Render pass
      * \param subpass Subpass index
-     * \param num_color_attachments The number of color attachments for the subpass
+     * \param num_color_attachments The number of color attachments for the pipeline
+     * \param has_depth_attachment Whether or not there is a depth attachment
      * \return VkPipeline
      */
     VkPipeline createGraphicsPipeline(const std::vector<Shader> &shaders, const VertexDescription &vertex_description,
-                                      VkPipelineLayout layout, VkRenderPass render_pass, u32 subpass, u32 num_color_attachments);
+                                      VkPipelineLayout layout, VkRenderPass render_pass, u32 subpass,
+                                      u32 num_color_attachments, bool has_depth_attachment);
 
     /**
      * \brief Get (or create if doesn't exist) the current swapchain framebuffer for a given graphics pass
@@ -108,7 +118,15 @@ public:
      * \param size Size of vertex data in bytes
      * \return VkBuffer
      */
-    VkBuffer createVertexBuffer(void *data, VkDeviceSize size);
+    VkBuffer createVertexBuffer(const void *data, VkDeviceSize size);
+
+    /**
+     * \brief Create an index buffer (of u32s) with the lifetime of the render device
+     * \param data Pointer to index data
+     * \param size Size of index buffer in bytes
+     * \return VkBuffer
+     */
+    VkBuffer createIndexBuffer(const void *data, VkDeviceSize size);
 
     /**
      * \brief Get a VkDescriptorSet with data specified in set for a graphics pass for the current frame
@@ -117,6 +135,16 @@ public:
      * \return VkDescriptorSet ready for binding
      */
     VkDescriptorSet getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set);
+
+    /**
+     * \brief From a list, get the first format that is supported by the device with given features
+     * \param formats List of formats to check
+     * \param feature The feature flag bits to check
+     * \param tiling The tiling
+     * \return First valid format from list or VK_FORMAT_UNDEFINED if none are valid
+     */
+    VkFormat getFirstSupportedFormat(const std::vector<VkFormat> &formats, VkFormatFeatureFlags feature,
+                                     VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
 
 private:
     /**
@@ -128,6 +156,15 @@ private:
      * \brief Create the swapchain and images for swapchain
      */
     void createSwapchain();
+
+    /**
+     * \brief Create a buffer on the GPU with the lifetime of the render device
+     * \param data Pointer to the data
+     * \param size Size of the buffer in bytes
+     * \param usage How the buffer will be used
+     * \return VkBuffer
+     */
+    VkBuffer createBuffer(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
 
     const Options options_;
 

@@ -5,6 +5,19 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    (void)scancode;
+    (void)mods;
+
+    ivy::InputState *input = static_cast<ivy::InputState *>(glfwGetWindowUserPointer(window));
+
+    if (action == GLFW_PRESS) {
+        input->pressKey(key);
+    } else if (action == GLFW_RELEASE) {
+        input->releaseKey(key);
+    }
+}
+
 namespace ivy {
 
 Platform::Platform(const Options &options) {
@@ -25,6 +38,9 @@ Platform::Platform(const Options &options) {
     if (!glfwVulkanSupported()) {
         Log::fatal("Vulkan is not supported");
     }
+
+    glfwSetWindowUserPointer(window_, &inputState_);
+    glfwSetKeyCallback(window_, key_callback);
 }
 
 Platform::~Platform() {
@@ -33,7 +49,13 @@ Platform::~Platform() {
 }
 
 void Platform::update() {
+    inputState_.transitionKeyStates();
+
     glfwPollEvents();
+
+    f64 now = glfwGetTime();
+    dt_ = static_cast<f32>(now - lastTime_);
+    lastTime_ = now;
 }
 
 bool Platform::isCloseRequested() const {

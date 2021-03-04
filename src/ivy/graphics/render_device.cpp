@@ -25,12 +25,12 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     vkEnumerateInstanceVersion(&instanceApiVersion);
 
     if (instanceApiVersion < VULKAN_API_VERSION) {
-        Log::fatal("Instance level Vulkan API version is %d.%d.%d which is lower than %d.%d.%d",
+        Log::fatal("Instance level Vulkan API version is %.%.% which is lower than %.%.%",
                    VK_VERSION_TO_COMMA_SEPARATED_VALUES(instanceApiVersion),
                    VK_VERSION_TO_COMMA_SEPARATED_VALUES(VULKAN_API_VERSION));
     }
 
-    Log::info("Vulkan %d.%d.%d is supported by instance. Using Vulkan %d.%d.%d",
+    Log::info("Vulkan %.%.% is supported by instance. Using Vulkan %.%.%",
               VK_VERSION_TO_COMMA_SEPARATED_VALUES(instanceApiVersion),
               VK_VERSION_TO_COMMA_SEPARATED_VALUES(VULKAN_API_VERSION));
 
@@ -313,14 +313,14 @@ void RenderDevice::endFrame() {
     // Debug stats for this frame
     //----------------------------------
 
-    if (consts::DEBUG) {
-        Log::debug("+-- Frame stats for %d -----------", swapImageIndex_);
-        Log::debug("| %d/%d bytes (%.2f%%) of the buffer were used for uniform buffers",
+    if constexpr (consts::DEBUG) {
+        Log::debug("+-- Frame stats for % -----------", swapImageIndex_);
+        Log::debug("| %/% bytes (%\\%) of the buffer were used for uniform buffers",
                    uniformBufferOffsets_[swapImageIndex_], uniformBufferSize_,
-                   100 * (uniformBufferOffsets_[swapImageIndex_] / (float)uniformBufferSize_));
-        Log::debug("| %d descriptor sets were used this frame",
+                   100.0f * (uniformBufferOffsets_[swapImageIndex_] / (f32)uniformBufferSize_));
+        Log::debug("| % descriptor sets were used this frame",
                    descriptorSetCaches_[swapImageIndex_].countNumUsed());
-        Log::debug("| %d descriptor sets are cached for this frame",
+        Log::debug("| % descriptor sets are cached for this frame",
                    descriptorSetCaches_[swapImageIndex_].countTotalCached());
         Log::debug("+-------------------------------");
     }
@@ -468,7 +468,8 @@ SubpassLayout RenderDevice::createLayout(const LayoutBindingsMap_t &layout_bindi
 
 VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shaders,
                                                 const VertexDescription &vertex_description, VkPipelineLayout layout,
-                                                VkRenderPass render_pass, u32 subpass, u32 num_color_attachments) {
+                                                VkRenderPass render_pass, u32 subpass, u32 num_color_attachments,
+                                                bool has_depth_attachment) {
     // Generate shader stages
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages(shaders.size());
     for (u32 i = 0; i < shaders.size(); ++i) {
@@ -518,7 +519,7 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     rasterizationCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizationCreateInfo.lineWidth = 1.0f;
     rasterizationCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizationCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizationCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizationCreateInfo.depthBiasEnable = VK_FALSE;
 
     // Multisampling
@@ -531,12 +532,12 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     multisampleCreateInfo.alphaToCoverageEnable = VK_FALSE;
     multisampleCreateInfo.alphaToOneEnable = VK_FALSE;
 
-    // TODO: Depth/stencil, check renderpass
-    // VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
-    // depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    // depthStencilCreateInfo.depthTestEnable = VK_TRUE;
-    // depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
-    // depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+    // Depth create info
+    VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
+    depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencilCreateInfo.depthTestEnable = VK_TRUE;
+    depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
+    depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 
     // Color blending
     VkPipelineColorBlendAttachmentState blendState = {};
@@ -553,6 +554,14 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     colorBlendCreateInfo.attachmentCount = (u32) colorBlendAttachmentStates.size();
     colorBlendCreateInfo.pAttachments = colorBlendAttachmentStates.data();
 
+    // Dynamic state
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT };
+
+    VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
+    dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicStateCreateInfo.pDynamicStates = dynamicStates;
+    dynamicStateCreateInfo.dynamicStateCount = COUNTOF(dynamicStates);
+
     VkGraphicsPipelineCreateInfo ci = {};
     ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     ci.pNext = nullptr;
@@ -565,9 +574,9 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     ci.pViewportState = &viewportCreateInfo;
     ci.pRasterizationState = &rasterizationCreateInfo;
     ci.pMultisampleState = &multisampleCreateInfo;
-    // ci.pDepthStencilState = &depthStencilCreateInfo;
+    ci.pDepthStencilState = has_depth_attachment ? &depthStencilCreateInfo : nullptr;
     ci.pColorBlendState = &colorBlendCreateInfo;
-    ci.pDynamicState = nullptr; // TODO: dynamic state
+    ci.pDynamicState = &dynamicStateCreateInfo;
     ci.layout = layout;
     ci.renderPass = render_pass;
     ci.subpass = subpass;
@@ -592,7 +601,7 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
 
     // Create framebuffers if they don't exist
     if (framebuffers_[renderPass].size() != swapchainImageViews_.size()) {
-        const std::unordered_map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
+        const std::map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
 
         // Per in-flight frame
         for (VkImageView &swapchainImageView : swapchainImageViews_) {
@@ -691,69 +700,20 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
     return framebuffers_[renderPass][swapImageIndex_];
 }
 
-VkBuffer RenderDevice::createVertexBuffer(void *data, VkDeviceSize size) {
+VkBuffer RenderDevice::createVertexBuffer(const void *data, VkDeviceSize size) {
     if (size <= 0) {
-        Log::fatal("Invalid vertex buffer size: %d", size);
+        Log::fatal("Invalid vertex buffer size: %", size);
     }
 
-    // Create our vertex buffer and memory
-    VkBufferCreateInfo vertexBufferCI = {};
-    vertexBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    vertexBufferCI.size = size;
-    vertexBufferCI.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    vertexBufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    return createBuffer(data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+}
 
-    VmaAllocationCreateInfo vertexAllocCI = {};
-    vertexAllocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-    VkBuffer vertexBuffer;
-    VmaAllocation vertexAllocation;
-    VmaAllocationInfo vertexAllocInfo;
-    VK_CHECKF(vmaCreateBuffer(allocator_, &vertexBufferCI, &vertexAllocCI, &vertexBuffer, &vertexAllocation,
-                              &vertexAllocInfo));
-    cleanupStack_.emplace([ = ]() {
-        vmaDestroyBuffer(allocator_, vertexBuffer, vertexAllocation);
-    });
-
-    VkMemoryPropertyFlags memFlags;
-    vmaGetMemoryTypeProperties(allocator_, vertexAllocInfo.memoryType, &memFlags);
-    if ((memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) {
-        // If the memory happens to be mappable, no need for staging buffer
-        void *mappedData;
-        vmaMapMemory(allocator_, vertexAllocation, &mappedData);
-        memcpy(mappedData, data, (size_t) size);
-        vmaUnmapMemory(allocator_, vertexAllocation);
-    } else {
-        // Otherwise, we need a staging buffer
-        VkBufferCreateInfo stagingBufferCI = {};
-        stagingBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        stagingBufferCI.size = size;
-        stagingBufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        stagingBufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        VmaAllocationCreateInfo stagingAllocCI = {};
-        stagingAllocCI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-        stagingAllocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-        VkBuffer stagingBuffer;
-        VmaAllocation stagingAllocation;
-        VmaAllocationInfo stagingAllocInfo;
-        VK_CHECKF(vmaCreateBuffer(allocator_, &stagingBufferCI, &stagingAllocCI, &stagingBuffer, &stagingAllocation,
-                                  &stagingAllocInfo));
-
-        // Copy data into staging buffer
-        memcpy(stagingAllocInfo.pMappedData, data, (size_t) size);
-
-        // Copy staging buffer into vertex buffer
-        submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
-            cmd.copyBuffer(vertexBuffer, stagingBuffer, size);
-        });
-
-        // Destroy staging buffer
-        vmaDestroyBuffer(allocator_, stagingBuffer, stagingAllocation);
+VkBuffer RenderDevice::createIndexBuffer(const void *data, VkDeviceSize size) {
+    if (size <= 0) {
+        Log::fatal("Invalid index buffer size: %", size);
     }
 
-    return vertexBuffer;
+    return createBuffer(data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 }
 
 VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set) {
@@ -776,7 +736,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         allocInfo.pSetLayouts = &layout;
 
         if (consts::DEBUG) {
-            Log::debug("Allocating new descriptor set for frame %d, subpass %d, set %d",
+            Log::debug("Allocating new descriptor set for frame %, subpass %, set %",
                        swapImageIndex_, subpassIdx, setIdx);
         }
         // TODO: handle case where we can't allocate new descriptor set
@@ -833,7 +793,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     VkBuffer buffer = uniformBuffers_.at(swapImageIndex_);
     for (const UniformBufferDescriptorInfo &info : set.getUniformBufferInfos()) {
         if (dstOffset + info.dataRange > uniformBufferSize_) {
-            Log::fatal("This uniform buffer for descriptor set %d in subpass %d will overrun the buffer! "
+            Log::fatal("This uniform buffer for descriptor set % in subpass % will overrun the buffer! "
                        "Too much data was set via uniform buffers this frame.",
                        set.getSetIndex(), set.getSubpassIndex());
         }
@@ -871,6 +831,21 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     vkUpdateDescriptorSets(device_, writes.size(), writes.data(), 0, nullptr);
 
     return dstSet;
+}
+
+VkFormat RenderDevice::getFirstSupportedFormat(const std::vector<VkFormat> &formats,
+                                               VkFormatFeatureFlags feature, VkImageTiling tiling) {
+    for (VkFormat format : formats) {
+        VkFormatProperties properties;
+        vkGetPhysicalDeviceFormatProperties(physicalDevice_, format, &properties);
+
+        if ((tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & feature) == feature) ||
+            (tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & feature) == feature)) {
+            return format;
+        }
+    }
+
+    return VK_FORMAT_UNDEFINED;
 }
 
 void RenderDevice::choosePhysicalDevice() {
@@ -968,14 +943,14 @@ void RenderDevice::choosePhysicalDevice() {
         }
 
         // Log information about the device
-        Log::info("| %s", properties.deviceName);
-        Log::info("|   Version:  %d.%d.%d", VK_VERSION_TO_COMMA_SEPARATED_VALUES(properties.apiVersion));
-        Log::info("|   Num Exts: %d", numDeviceExtensions);
-        Log::info("|   Discrete: %s", properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? "yes" : "no");
-        Log::info("|   Graphics: %s", graphicsFamilyIndex.first ? "yes" : "no");
-        Log::info("|   Compute:  %s", computeFamilyIndex.first ? "yes" : "no");
-        Log::info("|   Present:  %s", presentFamilyIndex.first ? "yes" : "no");
-        Log::info("|   Suitable: %s", suitable ? "yes" : "no");
+        Log::info("| %", properties.deviceName);
+        Log::info("|   Version:  %.%.%", VK_VERSION_TO_COMMA_SEPARATED_VALUES(properties.apiVersion));
+        Log::info("|   Num Exts: %", numDeviceExtensions);
+        Log::info("|   Discrete: %", properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? "yes" : "no");
+        Log::info("|   Graphics: %", graphicsFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Compute:  %", computeFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Present:  %", presentFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Suitable: %", suitable ? "yes" : "no");
         Log::info("+-------------------------------");
     }
 
@@ -987,7 +962,7 @@ void RenderDevice::choosePhysicalDevice() {
     vkGetPhysicalDeviceProperties(physicalDevice_, &properties);
     limits_ = properties.limits;
 
-    Log::info("Using physical device: %s", properties.deviceName);
+    Log::info("Using physical device: %", properties.deviceName);
 }
 
 void RenderDevice::createSwapchain() {
@@ -1058,7 +1033,7 @@ void RenderDevice::createSwapchain() {
                 return VK_PRESENT_MODE_FIFO_KHR;
         }
 
-        Log::fatal("Unknown desired present mode: %d", static_cast<u32>(options_.desiredPresentMode));
+        Log::fatal("Unknown desired present mode: %", static_cast<u32>(options_.desiredPresentMode));
     }
     ();
 
@@ -1142,6 +1117,66 @@ void RenderDevice::createSwapchain() {
             vkDestroyImageView(device_, swapchainImageViews_[i], nullptr);
         });
     }
+}
+
+VkBuffer RenderDevice::createBuffer(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage) {
+    // Create our buffer and memory
+    VkBufferCreateInfo bufferCI = {};
+    bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCI.size = size;
+    bufferCI.usage = usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocCI = {};
+    allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo allocInfo;
+    VK_CHECKF(vmaCreateBuffer(allocator_, &bufferCI, &allocCI, &buffer, &allocation, &allocInfo));
+    cleanupStack_.emplace([ = ]() {
+        vmaDestroyBuffer(allocator_, buffer, allocation);
+    });
+
+    VkMemoryPropertyFlags memFlags;
+    vmaGetMemoryTypeProperties(allocator_, allocInfo.memoryType, &memFlags);
+    if ((memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) {
+        // If the memory happens to be mappable, no need for staging buffer
+        void *mappedData;
+        vmaMapMemory(allocator_, allocation, &mappedData);
+        memcpy(mappedData, data, (size_t) size);
+        vmaUnmapMemory(allocator_, allocation);
+    } else {
+        // Otherwise, we need a staging buffer
+        VkBufferCreateInfo stagingBufferCI = {};
+        stagingBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        stagingBufferCI.size = size;
+        stagingBufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        stagingBufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo stagingAllocCI = {};
+        stagingAllocCI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+        stagingAllocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+        VkBuffer stagingBuffer;
+        VmaAllocation stagingAllocation;
+        VmaAllocationInfo stagingAllocInfo;
+        VK_CHECKF(vmaCreateBuffer(allocator_, &stagingBufferCI, &stagingAllocCI, &stagingBuffer, &stagingAllocation,
+                                  &stagingAllocInfo));
+
+        // Copy data into staging buffer
+        memcpy(stagingAllocInfo.pMappedData, data, (size_t) size);
+
+        // Copy staging buffer into vertex buffer
+        submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
+            cmd.copyBuffer(buffer, stagingBuffer, size);
+        });
+
+        // Destroy staging buffer
+        vmaDestroyBuffer(allocator_, stagingBuffer, stagingAllocation);
+    }
+
+    return buffer;
 }
 
 }

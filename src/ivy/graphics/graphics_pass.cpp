@@ -3,6 +3,7 @@
 #include "ivy/graphics/vk_utils.h"
 #include "ivy/log.h"
 #include "ivy/consts.h"
+#include <unordered_set>
 
 namespace ivy::gfx {
 
@@ -21,13 +22,17 @@ GraphicsPass GraphicsPassBuilder::build() {
     // Used to turn an attachment name into an index for attachmentDescriptions
     std::unordered_map<std::string, u32> attachmentLocations;
 
+    // A set of unreferenced attachments for validation
+    std::unordered_set<std::string> unreferencedAttachments;
+
     for (const auto &attachmentPair : attachments_) {
         const std::string &name = attachmentPair.first;
         const AttachmentInfo &info = attachmentPair.second;
-        Log::debug("- Processing attachment: %s", name.c_str());
+        Log::debug("- Processing attachment: %", name);
 
         attachmentLocations[name] = attachmentDescriptions.size();
         attachmentDescriptions.emplace_back(info.description);
+        unreferencedAttachments.emplace(name);
     }
 
     //--------------------------------------
@@ -44,39 +49,22 @@ GraphicsPass GraphicsPassBuilder::build() {
     // Holds attachment references for color attachments in subpasses by name <subpass_name, reference>
     std::unordered_map<std::string, std::vector<VkAttachmentReference>> colorAttachmentReferences;
 
+    // Holds attachment references for depth attachments in subpasses by name <subpass_name, reference>
+    std::unordered_map<std::string, std::optional<VkAttachmentReference>> depthAttachmentReferences;
+
     // Holds attachment references for input attachments in subpasses by name <subpass_name, reference>
     std::unordered_map<std::string, std::vector<VkAttachmentReference>> inputAttachmentReferences;
 
     for (const std::string &subpassName : subpassOrder_) {
-        Log::debug("- Processing subpass: %s", subpassName.c_str());
+        Log::debug("- Processing subpass: %", subpassName);
 
         // Keep track of where this subpass is in subpassDescriptions vector
         subpassLocations[subpassName] = subpassDescriptions.size();
 
-        // Process input attachments
-        for (const std::string &inputAttachmentName : subpassInfos_[subpassName].inputAttachmentNames_) {
-            Log::debug("  - Processing input attachment: %s", inputAttachmentName.c_str());
-
-            if constexpr (consts::DEBUG) {
-                if (attachmentLocations.find(inputAttachmentName) == attachmentLocations.end()) {
-                    Log::fatal("Input attachment '%s' was not added to the graphics pass", inputAttachmentName.c_str());
-                }
-            }
-
-            // Create an attachment reference for this input attachment
-            VkAttachmentReference reference = {};
-            reference.attachment = attachmentLocations[inputAttachmentName];
-            reference.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-            // Set the usage for this attachment
-            attachments_[inputAttachmentName].usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-
-            // Add it to the list of input attachments for this subpass
-            inputAttachmentReferences[subpassName].emplace_back(reference);
-        }
-
         // Process color attachments
         for (const std::string &colorAttachmentName : subpassInfos_[subpassName].colorAttachmentNames_) {
+            unreferencedAttachments.erase(colorAttachmentName);
+
             // Mark unused attachments as VK_ATTACHMENT_UNUSED and continue
             if (colorAttachmentName == GraphicsPass::UnusedName) {
                 VkAttachmentReference reference = {};
@@ -86,11 +74,11 @@ GraphicsPass GraphicsPassBuilder::build() {
                 continue;
             }
 
-            Log::debug("  - Processing color attachment: %s", colorAttachmentName.c_str());
+            Log::debug("  - Processing color attachment: %", colorAttachmentName);
 
             if constexpr (consts::DEBUG) {
                 if (attachmentLocations.find(colorAttachmentName) == attachmentLocations.end()) {
-                    Log::fatal("Color attachment '%s' was not added to the graphics pass", colorAttachmentName.c_str());
+                    Log::fatal("Color attachment '%' was not added to the graphics pass", colorAttachmentName);
                 }
             }
 
@@ -106,6 +94,55 @@ GraphicsPass GraphicsPassBuilder::build() {
             colorAttachmentReferences[subpassName].emplace_back(reference);
         }
 
+        // Process depth attachment
+        if (subpassInfos_[subpassName].depthAttachmentName_.has_value()) {
+            const auto &depthAttachmentName = subpassInfos_[subpassName].depthAttachmentName_.value();
+            unreferencedAttachments.erase(depthAttachmentName);
+
+            Log::debug("  - Processing depth attachment: %", depthAttachmentName);
+
+            if constexpr (consts::DEBUG) {
+                if (attachmentLocations.find(depthAttachmentName) == attachmentLocations.end()) {
+                    Log::fatal("Depth attachment '%' was not added to the graphics pass", depthAttachmentName);
+                }
+            }
+
+            // Create an attachment reference for this depth attachment
+            VkAttachmentReference reference = {};
+            reference.attachment = attachmentLocations[depthAttachmentName];
+            reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+            // Set the usage for this attachment
+            attachments_[depthAttachmentName].usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+            // Add it to the list of depth attachments for this subpass
+            depthAttachmentReferences[subpassName] = reference;
+        }
+
+        // Process input attachments
+        for (const std::string &inputAttachmentName : subpassInfos_[subpassName].inputAttachmentNames_) {
+            unreferencedAttachments.erase(inputAttachmentName);
+
+            Log::debug("  - Processing input attachment: %", inputAttachmentName);
+
+            if constexpr (consts::DEBUG) {
+                if (attachmentLocations.find(inputAttachmentName) == attachmentLocations.end()) {
+                    Log::fatal("Input attachment '%' was not added to the graphics pass", inputAttachmentName);
+                }
+            }
+
+            // Create an attachment reference for this input attachment
+            VkAttachmentReference reference = {};
+            reference.attachment = attachmentLocations[inputAttachmentName];
+            reference.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            // Set the usage for this attachment
+            attachments_[inputAttachmentName].usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+
+            // Add it to the list of input attachments for this subpass
+            inputAttachmentReferences[subpassName].emplace_back(reference);
+        }
+
         // Create the subpass description
         VkSubpassDescription subpassDescription = {};
         subpassDescription.flags = 0;
@@ -115,11 +152,26 @@ GraphicsPass GraphicsPassBuilder::build() {
         subpassDescription.colorAttachmentCount = (u32) colorAttachmentReferences[subpassName].size();
         subpassDescription.pColorAttachments = colorAttachmentReferences[subpassName].data();
         subpassDescription.pResolveAttachments = nullptr;
-        subpassDescription.pDepthStencilAttachment = nullptr;
+        if (depthAttachmentReferences[subpassName].has_value()) {
+            subpassDescription.pDepthStencilAttachment = &depthAttachmentReferences[subpassName].value();
+        }
         subpassDescription.preserveAttachmentCount = 0;
         subpassDescription.pPreserveAttachments = nullptr;
 
         subpassDescriptions.emplace_back(subpassDescription);
+    }
+
+    if constexpr (consts::DEBUG) {
+        if (!unreferencedAttachments.empty()) {
+            std::string errMsg = "% attachment% not referenced by any subpasses:";
+
+            for (const auto &unreferenced : unreferencedAttachments) {
+                errMsg += "\n- " + unreferenced;
+            }
+
+            Log::fatal(errMsg, unreferencedAttachments.size(),
+                       unreferencedAttachments.size() == 1 ? " was" : "s were");
+        }
     }
 
     //--------------------------------------
@@ -131,17 +183,17 @@ GraphicsPass GraphicsPassBuilder::build() {
     // Create dependencies
     std::vector<VkSubpassDependency> dependencies = {};
     for (const DependencyInfo &info : subpassDependencyInfo_) {
-        Log::debug("  - Processing dependency: %s -> %s", info.srcSubpass.c_str(), info.dstSubpass.c_str());
+        Log::debug("  - Processing dependency: % -> %", info.srcSubpass, info.dstSubpass);
 
         if constexpr (consts::DEBUG) {
             if (subpassLocations.find(info.srcSubpass) == subpassLocations.end()) {
-                Log::fatal("Subpass dependency could not be processed because '%s' is not a subpass in this graphics pass",
-                           info.srcSubpass.c_str());
+                Log::fatal("Subpass dependency could not be processed because '%' is not a subpass in this graphics pass",
+                           info.srcSubpass);
             }
 
             if (subpassLocations.find(info.dstSubpass) == subpassLocations.end()) {
-                Log::fatal("Subpass dependency could not be processed because '%s' is not a subpass in this graphics pass",
-                           info.dstSubpass.c_str());
+                Log::fatal("Subpass dependency could not be processed because '%' is not a subpass in this graphics pass",
+                           info.dstSubpass);
             }
         }
 
@@ -179,7 +231,7 @@ GraphicsPass GraphicsPassBuilder::build() {
         const std::string &subpass_name = subpassOrder_[subpassIdx];
         const SubpassInfo &subpassInfo = subpassInfos_[subpass_name];
 
-        Log::debug("  - Subpass %s has %d set%s", subpass_name.c_str(), subpassInfo.descriptors_.size(),
+        Log::debug("  - Subpass % has % set%", subpass_name, subpassInfo.descriptors_.size(),
                    subpassInfo.descriptors_.size() != 1 ? "s" : "");
 
         // Create DescriptorSetLayouts for GraphicsPass
@@ -198,9 +250,9 @@ GraphicsPass GraphicsPassBuilder::build() {
             descriptorSetLayouts[subpassIdx].emplace(setIdx, DescriptorSetLayout(subpassIdx, setIdx, bindingsVector));
 
             // Debug logging
-            Log::debug("    - set %d has %d bindings", setIdx, bindings.size());
+            Log::debug("    - set % has % bindings", setIdx, bindings.size());
             for (u32 bindingIdx = 0; bindingIdx < bindingsVector.size(); ++bindingIdx) {
-                Log::debug("      - binding %d: %s", bindingIdx,
+                Log::debug("      - binding %: %", bindingIdx,
                            vk_descriptor_type_to_string(bindingsVector[bindingIdx].descriptorType));
             }
         }
@@ -212,7 +264,7 @@ GraphicsPass GraphicsPassBuilder::build() {
         subpasses.emplace_back(
             device_.createGraphicsPipeline(
                 subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass, subpasses.size(),
-                subpassInfo.colorAttachmentNames_.size()
+                subpassInfo.colorAttachmentNames_.size(), subpassInfo.depthAttachmentName_.has_value()
             ),
             layout,
             subpass_name
@@ -223,16 +275,41 @@ GraphicsPass GraphicsPassBuilder::build() {
     return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts);
 }
 
+GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format) {
+    bool separateDepthStencilLayoutsEnabled = false;
+    bool isDepth = format >= VK_FORMAT_D16_UNORM && format <= VK_FORMAT_D32_SFLOAT_S8_UINT && format != VK_FORMAT_S8_UINT;
+    bool isStencil = format >= VK_FORMAT_S8_UINT && format <= VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+    VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE;
+    VkAttachmentLoadOp stencil_load_op = isStencil ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    VkAttachmentStoreOp stencil_store_op = isStencil ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkImageLayout final_layout;
+    if ((isDepth && isStencil) || (isDepth && !separateDepthStencilLayoutsEnabled)) {
+        final_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    } else if (isDepth && separateDepthStencilLayoutsEnabled) {
+        final_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+    } else if (isStencil) {
+        final_layout = VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL;
+    } else {
+        final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    }
+
+    return addAttachment(attachment_name, format, load_op, store_op, stencil_load_op, stencil_store_op,
+                         initial_layout, final_layout);
+}
+
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,
                                                         VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
                                                         VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op,
                                                         VkImageLayout initial_layout, VkImageLayout final_layout) {
     if constexpr (consts::DEBUG) {
         if (attachments_.find(attachment_name) != attachments_.end()) {
-            Log::fatal("Attachment '%s' was added multiple times to the same graphics pass!", attachment_name.c_str());
+            Log::fatal("Attachment '%' was added multiple times to the same graphics pass!", attachment_name);
         }
         if (attachment_name == GraphicsPass::UnusedName) {
-            Log::fatal("'%s' is a reserved attachment name", attachment_name.c_str());
+            Log::fatal("'%' is a reserved attachment name", attachment_name);
         }
     }
 
@@ -260,10 +337,10 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachmentSwapchain() {
 GraphicsPassBuilder &GraphicsPassBuilder::addSubpass(const std::string &subpass_name, const SubpassInfo &subpass) {
     if constexpr (consts::DEBUG) {
         if (subpass_name == GraphicsPass::SwapchainName) {
-            Log::fatal("'%s' is a reserved subpass name", subpass_name.c_str());
+            Log::fatal("'%' is a reserved subpass name", subpass_name);
         }
         if (subpassInfos_.find(subpass_name) != subpassInfos_.end()) {
-            Log::fatal("Subpass '%s' was added multiple times to the same graphics pass!", subpass_name.c_str());
+            Log::fatal("Subpass '%' was added multiple times to the same graphics pass!", subpass_name);
         }
     }
 
@@ -315,6 +392,19 @@ SubpassBuilder &SubpassBuilder::addColorAttachment(const std::string &attachment
 
     // Set the attachment
     names[location] = attachment_name;
+
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::addDepthAttachment(const std::string &attachment_name) {
+    if constexpr (consts::DEBUG) {
+        if (subpass_.depthAttachmentName_.has_value()) {
+            Log::fatal("Cannot add depth attachment '%' to subpass because '%' was already added",
+                       attachment_name, subpass_.depthAttachmentName_.value());
+        }
+    }
+
+    subpass_.depthAttachmentName_ = attachment_name;
 
     return *this;
 }

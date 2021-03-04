@@ -30,7 +30,11 @@ public:
 
     void bindVertexBuffer(VkBuffer buffer);
 
+    void bindIndexBuffer(VkBuffer buffer);
+
     void draw(u32 num_vertices, u32 num_instances, u32 first_vertex, u32 first_instance);
+
+    void drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset, u32 first_instance);
 
     void copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, VkDeviceSize dst_offset = 0,
                     VkDeviceSize src_offset = 0);

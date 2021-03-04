@@ -73,13 +73,13 @@ VkShaderModule loadShader(VkDevice device, const std::string &shader_path);
  * \brief Check a VkResult, fatal error if not VK_SUCCESS
  */
 #define VK_CHECKF(x) do { VkResult result = (x); if (result != VK_SUCCESS) { \
-            ivy::Log::fatal("%s:%d: [%s] %s", __FILE__, __LINE__, ivy::gfx::vk_result_to_string(result), #x); } } while (0)
+            ivy::Log::fatal("%:%: [%] %", __FILE__, __LINE__, ivy::gfx::vk_result_to_string(result), #x); } } while (0)
 
 /**
  * \brief Check a VkResult, warn if not VK_SUCCESS
  */
 #define VK_CHECKW(x) do { VkResult result = (x); if (result != VK_SUCCESS) { \
-            ivy::Log::warn("%s:%d: [%s] %s", __FILE__, __LINE__, ivy::gfx::vk_result_to_string(result), #x); } } while (0)
+            ivy::Log::warn("%:%: [%] %", __FILE__, __LINE__, ivy::gfx::vk_result_to_string(result), #x); } } while (0)
 
 /**
  * \brief Separate a VK_VERSION into major, minor, patch

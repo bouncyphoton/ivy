@@ -23,23 +23,38 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     renderPassBeginInfo.renderArea.offset = {0, 0};
     renderPassBeginInfo.renderArea.extent = framebuffer.getExtent();
 
-    VkClearValue clearColor = {};
-    clearColor.color.float32[0] = 0.0f;
-    clearColor.color.float32[1] = 0.0f;
-    clearColor.color.float32[2] = 0.0f;
-    clearColor.color.float32[3] = 1.0f;
-    clearColor.depthStencil = {0.0f, 0};
+    // Generate clear values for each attachment
+    std::vector<VkClearValue> clearValues;
+    clearValues.reserve(pass.getAttachmentInfos().size());
+    for (const auto &infoPair : pass.getAttachmentInfos()) {
+        const AttachmentInfo &info = infoPair.second;
+        VkClearValue value = {};
 
-    // Need a clear color for each attachment
-    std::vector<VkClearValue> clearColors(pass.getAttachmentInfos().size(), clearColor);
+        // VkClearValue unions color and depth stencil
+        if (info.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+            value.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        } else if (info.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+            value.depthStencil = {1.0f, 0};
+        }
 
-    renderPassBeginInfo.clearValueCount = clearColors.size();
-    renderPassBeginInfo.pClearValues = clearColors.data();
+        clearValues.emplace_back(value);
+    }
+    renderPassBeginInfo.clearValueCount = clearValues.size();
+    renderPassBeginInfo.pClearValues = clearValues.data();
 
+    // Flip the viewport upside down
+    VkViewport viewport = {};
+    viewport.width = (f32) renderPassBeginInfo.renderArea.extent.width;
+    viewport.height = -1.0f * (f32) renderPassBeginInfo.renderArea.extent.height;
+    viewport.x = (f32) renderPassBeginInfo.renderArea.offset.x;
+    viewport.y = (f32) renderPassBeginInfo.renderArea.offset.y + (f32) renderPassBeginInfo.renderArea.extent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    // Start render pass, call user functions, end render pass
     vkCmdBeginRenderPass(commandBuffer_, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
+    vkCmdSetViewport(commandBuffer_, 0, 1, &viewport);
     func();
-
     vkCmdEndRenderPass(commandBuffer_);
 }
 
@@ -65,8 +80,17 @@ void CommandBuffer::bindVertexBuffer(VkBuffer buffer) {
     vkCmdBindVertexBuffers(commandBuffer_, 0, 1, &buffer, offsets);
 }
 
+void CommandBuffer::bindIndexBuffer(VkBuffer buffer) {
+    vkCmdBindIndexBuffer(commandBuffer_, buffer, 0, VK_INDEX_TYPE_UINT32);
+}
+
 void CommandBuffer::draw(u32 num_vertices, u32 num_instances, u32 first_vertex, u32 first_instance) {
     vkCmdDraw(commandBuffer_, num_vertices, num_instances, first_vertex, first_instance);
+}
+
+void CommandBuffer::drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset,
+                                u32 first_instance) {
+    vkCmdDrawIndexed(commandBuffer_, num_indices, num_instances, first_index, vertex_offset, first_instance);
 }
 
 void CommandBuffer::copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, VkDeviceSize dst_offset,

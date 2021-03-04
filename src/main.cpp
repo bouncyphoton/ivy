@@ -1,12 +1,6 @@
-#include "ivy/engine.h"
+#include "test_game/test_game.h"
 
 int main() {
-    ivy::Engine engine;
-    engine.getOptions().appName = "Vulkan G-Buffer Demo | ivy engine";
-    engine.getOptions().renderWidth = 800;
-    engine.getOptions().renderHeight = 600;
-
-    engine.run();
-
+    TestGame game;
     return 0;
 }

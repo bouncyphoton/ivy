@@ -3,7 +3,7 @@ project(ivy)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(ivy src/main.cpp src/ivy/engine.cpp src/ivy/engine.h src/ivy/types.h src/ivy/renderer.cpp src/ivy/renderer.h src/ivy/platform/platform.cpp src/ivy/platform/platform.h src/ivy/log.h src/ivy/utils/utils.cpp src/ivy/utils/utils.h src/ivy/graphics/render_device.cpp src/ivy/graphics/render_device.h src/ivy/graphics/vk_utils.cpp src/ivy/graphics/vk_utils.h src/ivy/consts.h src/ivy/graphics/command_buffer.cpp src/ivy/graphics/command_buffer.h src/ivy/options.h src/ivy/graphics/framebuffer.h src/ivy/graphics/vertex.h src/ivy/graphics/graphics_pass.cpp src/ivy/graphics/graphics_pass.h src/ivy/graphics/shader.h src/ivy/graphics/vertex_description.h src/ivy/graphics/descriptor_set.cpp src/ivy/graphics/descriptor_set.h src/ivy/graphics/descriptor_set_cache.cpp src/ivy/graphics/descriptor_set_cache.h)
+add_executable(ivy src/main.cpp src/ivy/engine.cpp src/ivy/engine.h src/ivy/types.h src/test_game/renderer.cpp src/test_game/renderer.h src/ivy/platform/platform.cpp src/ivy/platform/platform.h src/ivy/log.h src/ivy/utils/utils.cpp src/ivy/utils/utils.h src/ivy/graphics/render_device.cpp src/ivy/graphics/render_device.h src/ivy/graphics/vk_utils.cpp src/ivy/graphics/vk_utils.h src/ivy/consts.h src/ivy/graphics/command_buffer.cpp src/ivy/graphics/command_buffer.h src/ivy/options.h src/ivy/graphics/framebuffer.h src/ivy/graphics/vertex.h src/ivy/graphics/graphics_pass.cpp src/ivy/graphics/graphics_pass.h src/ivy/graphics/shader.h src/ivy/graphics/vertex_description.h src/ivy/graphics/descriptor_set.cpp src/ivy/graphics/descriptor_set.h src/ivy/graphics/descriptor_set_cache.cpp src/ivy/graphics/descriptor_set_cache.h src/ivy/graphics/geometry.cpp src/ivy/graphics/geometry.h src/ivy/entity/entity.inl src/ivy/entity/entity.h src/ivy/entity/components/transform.h src/ivy/entity/components/model.h src/ivy/entity/components/component.h src/ivy/resources/resource_manager.cpp src/ivy/resources/resource_manager.h src/ivy/resources/model_resource.cpp src/ivy/resources/model_resource.h src/ivy/platform/input_state.cpp src/ivy/platform/input_state.h src/test_game/test_game.cpp src/test_game/test_game.h)
 target_include_directories(ivy PRIVATE src/)
 
 # GLFW
@@ -24,6 +24,12 @@ target_include_directories(ivy PRIVATE ${VMA_SRC})
 
 # GLM
 target_include_directories(ivy PRIVATE external/glm)
+add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_SILENT_WARNINGS)
+
+# Assimp
+set(BUILD_SHARED_LIBS off)
+add_subdirectory(external/assimp)
+target_link_libraries(ivy assimp)
 
 # Set compile options
 if (MSVC)

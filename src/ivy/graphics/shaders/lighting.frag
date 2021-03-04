@@ -6,5 +6,5 @@ layout (input_attachment_index = 1, set = 0, binding = 1) uniform subpassInput i
 layout (location = 0) out vec4 oFragColor;
 
 void main() {
-    oFragColor = subpassLoad(iAlbedo).rgba * subpassLoad(iPosition).y;
+    oFragColor = subpassLoad(iAlbedo).rgba * vec4(fract(subpassLoad(iPosition).rgb), 1);
 }
