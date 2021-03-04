@@ -66,7 +66,7 @@ bool ResourceManager::loadModelFromFile(const std::string &resource_path) {
     std::vector<gfx::Geometry> geometries;
 
     Assimp::Importer importer;
-    const aiScene *scene = importer.ReadFile(filePath.c_str(), aiProcess_Triangulate);
+    const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(), aiProcess_Triangulate);
     if (!scene) {
         Log::warn("Failed to read resource '%s': %s", filePath.c_str(), importer.GetErrorString());
         return false;

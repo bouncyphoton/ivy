@@ -143,7 +143,7 @@ public:
      * \param tiling The tiling
      * \return First valid format from list or VK_FORMAT_UNDEFINED if none are valid
      */
-    VkFormat getFirstSupportedFormat(const std::vector<VkFormat> &formats, VkFormatFeatureFlagBits feature,
+    VkFormat getFirstSupportedFormat(const std::vector<VkFormat> &formats, VkFormatFeatureFlags feature,
                                      VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
 
 private:

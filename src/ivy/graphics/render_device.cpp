@@ -834,7 +834,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
 }
 
 VkFormat RenderDevice::getFirstSupportedFormat(const std::vector<VkFormat> &formats,
-                                               VkFormatFeatureFlagBits feature, VkImageTiling tiling) {
+                                               VkFormatFeatureFlags feature, VkImageTiling tiling) {
     for (VkFormat format : formats) {
         VkFormatProperties properties;
         vkGetPhysicalDeviceFormatProperties(physicalDevice_, format, &properties);

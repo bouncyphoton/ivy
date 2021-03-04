@@ -30,7 +30,7 @@ template<typename T>
 void Entity::setComponent(const T &component) {
     static_assert(std::is_base_of<Component, T>(), "T is not a valid component");
 
-    components_[typeid(T)] = std::make_unique<T>(component);
+    components_[typeid(T)] = std::make_shared<T>(component);
 }
 
 template<typename T>

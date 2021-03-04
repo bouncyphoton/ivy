@@ -24,7 +24,7 @@ target_include_directories(ivy PRIVATE ${VMA_SRC})
 
 # GLM
 target_include_directories(ivy PRIVATE external/glm)
-add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE)
+add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_SILENT_WARNINGS)
 
 # Assimp
 set(BUILD_SHARED_LIBS off)

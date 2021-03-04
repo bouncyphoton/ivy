@@ -52,7 +52,7 @@ public:
 
 private:
     std::string tag_;
-    std::unordered_map<std::type_index, std::unique_ptr<Component>> components_;
+    std::unordered_map<std::type_index, std::shared_ptr<Component>> components_;
 };
 
 }
