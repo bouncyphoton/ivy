@@ -25,12 +25,12 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     vkEnumerateInstanceVersion(&instanceApiVersion);
 
     if (instanceApiVersion < VULKAN_API_VERSION) {
-        Log::fatal("Instance level Vulkan API version is %d.%d.%d which is lower than %d.%d.%d",
+        Log::fatal("Instance level Vulkan API version is %.%.% which is lower than %.%.%",
                    VK_VERSION_TO_COMMA_SEPARATED_VALUES(instanceApiVersion),
                    VK_VERSION_TO_COMMA_SEPARATED_VALUES(VULKAN_API_VERSION));
     }
 
-    Log::info("Vulkan %d.%d.%d is supported by instance. Using Vulkan %d.%d.%d",
+    Log::info("Vulkan %.%.% is supported by instance. Using Vulkan %.%.%",
               VK_VERSION_TO_COMMA_SEPARATED_VALUES(instanceApiVersion),
               VK_VERSION_TO_COMMA_SEPARATED_VALUES(VULKAN_API_VERSION));
 
@@ -314,13 +314,13 @@ void RenderDevice::endFrame() {
     //----------------------------------
 
     if constexpr (consts::DEBUG) {
-        Log::debug("+-- Frame stats for %d -----------", swapImageIndex_);
-        Log::debug("| %d/%d bytes (%.2f%%) of the buffer were used for uniform buffers",
+        Log::debug("+-- Frame stats for % -----------", swapImageIndex_);
+        Log::debug("| %/% bytes (%\\%) of the buffer were used for uniform buffers",
                    uniformBufferOffsets_[swapImageIndex_], uniformBufferSize_,
-                   100 * (uniformBufferOffsets_[swapImageIndex_] / (float)uniformBufferSize_));
-        Log::debug("| %d descriptor sets were used this frame",
+                   100.0f * (uniformBufferOffsets_[swapImageIndex_] / (f32)uniformBufferSize_));
+        Log::debug("| % descriptor sets were used this frame",
                    descriptorSetCaches_[swapImageIndex_].countNumUsed());
-        Log::debug("| %d descriptor sets are cached for this frame",
+        Log::debug("| % descriptor sets are cached for this frame",
                    descriptorSetCaches_[swapImageIndex_].countTotalCached());
         Log::debug("+-------------------------------");
     }
@@ -702,7 +702,7 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
 
 VkBuffer RenderDevice::createVertexBuffer(const void *data, VkDeviceSize size) {
     if (size <= 0) {
-        Log::fatal("Invalid vertex buffer size: %d", size);
+        Log::fatal("Invalid vertex buffer size: %", size);
     }
 
     return createBuffer(data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -710,7 +710,7 @@ VkBuffer RenderDevice::createVertexBuffer(const void *data, VkDeviceSize size) {
 
 VkBuffer RenderDevice::createIndexBuffer(const void *data, VkDeviceSize size) {
     if (size <= 0) {
-        Log::fatal("Invalid index buffer size: %d", size);
+        Log::fatal("Invalid index buffer size: %", size);
     }
 
     return createBuffer(data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
@@ -736,7 +736,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         allocInfo.pSetLayouts = &layout;
 
         if (consts::DEBUG) {
-            Log::debug("Allocating new descriptor set for frame %d, subpass %d, set %d",
+            Log::debug("Allocating new descriptor set for frame %, subpass %, set %",
                        swapImageIndex_, subpassIdx, setIdx);
         }
         // TODO: handle case where we can't allocate new descriptor set
@@ -793,7 +793,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     VkBuffer buffer = uniformBuffers_.at(swapImageIndex_);
     for (const UniformBufferDescriptorInfo &info : set.getUniformBufferInfos()) {
         if (dstOffset + info.dataRange > uniformBufferSize_) {
-            Log::fatal("This uniform buffer for descriptor set %d in subpass %d will overrun the buffer! "
+            Log::fatal("This uniform buffer for descriptor set % in subpass % will overrun the buffer! "
                        "Too much data was set via uniform buffers this frame.",
                        set.getSetIndex(), set.getSubpassIndex());
         }
@@ -943,14 +943,14 @@ void RenderDevice::choosePhysicalDevice() {
         }
 
         // Log information about the device
-        Log::info("| %s", properties.deviceName);
-        Log::info("|   Version:  %d.%d.%d", VK_VERSION_TO_COMMA_SEPARATED_VALUES(properties.apiVersion));
-        Log::info("|   Num Exts: %d", numDeviceExtensions);
-        Log::info("|   Discrete: %s", properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? "yes" : "no");
-        Log::info("|   Graphics: %s", graphicsFamilyIndex.first ? "yes" : "no");
-        Log::info("|   Compute:  %s", computeFamilyIndex.first ? "yes" : "no");
-        Log::info("|   Present:  %s", presentFamilyIndex.first ? "yes" : "no");
-        Log::info("|   Suitable: %s", suitable ? "yes" : "no");
+        Log::info("| %", properties.deviceName);
+        Log::info("|   Version:  %.%.%", VK_VERSION_TO_COMMA_SEPARATED_VALUES(properties.apiVersion));
+        Log::info("|   Num Exts: %", numDeviceExtensions);
+        Log::info("|   Discrete: %", properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? "yes" : "no");
+        Log::info("|   Graphics: %", graphicsFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Compute:  %", computeFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Present:  %", presentFamilyIndex.first ? "yes" : "no");
+        Log::info("|   Suitable: %", suitable ? "yes" : "no");
         Log::info("+-------------------------------");
     }
 
@@ -962,7 +962,7 @@ void RenderDevice::choosePhysicalDevice() {
     vkGetPhysicalDeviceProperties(physicalDevice_, &properties);
     limits_ = properties.limits;
 
-    Log::info("Using physical device: %s", properties.deviceName);
+    Log::info("Using physical device: %", properties.deviceName);
 }
 
 void RenderDevice::createSwapchain() {
@@ -1033,7 +1033,7 @@ void RenderDevice::createSwapchain() {
                 return VK_PRESENT_MODE_FIFO_KHR;
         }
 
-        Log::fatal("Unknown desired present mode: %d", static_cast<u32>(options_.desiredPresentMode));
+        Log::fatal("Unknown desired present mode: %", static_cast<u32>(options_.desiredPresentMode));
     }
     ();
 

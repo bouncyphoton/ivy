@@ -83,8 +83,8 @@ void DescriptorSet::validate() const {
     }
 
     if (!errorMessage.empty()) {
-        Log::fatal("Descriptor set %d for subpass %d (%s) is invalid:%s", layout_.setIndex, layout_.subpassIndex,
-                   subpassName_.c_str(), errorMessage.c_str());
+        Log::fatal("Descriptor set % for subpass % (%) is invalid: %", layout_.setIndex, layout_.subpassIndex,
+                   subpassName_, errorMessage);
     }
 }
 

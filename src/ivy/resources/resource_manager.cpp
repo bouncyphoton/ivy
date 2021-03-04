@@ -10,7 +10,7 @@ namespace ivy {
 ResourceManager::ResourceManager(gfx::RenderDevice &render_device, const std::string &resource_directory)
     : device_(render_device), resourceDirectory_(resource_directory + "/") {
     if (!std::filesystem::is_directory(resourceDirectory_)) {
-        Log::fatal("Invalid resource directory: '%s'", resourceDirectory_.c_str());
+        Log::fatal("Invalid resource directory: '%'", resourceDirectory_);
     }
 
     // Load default cube
@@ -41,7 +41,7 @@ ModelResource ResourceManager::getModel(const std::string &model_name) {
     auto it = modelDatas_.find(model_name);
     if (it == modelDatas_.end()) {
         if (!loadModelFromFile(model_name)) {
-            Log::fatal("Failed to get model '%s'", model_name.c_str());
+            Log::fatal("Failed to get model '%'", model_name);
         }
 
         it = modelDatas_.find(model_name);
@@ -54,12 +54,12 @@ bool ResourceManager::loadModelFromFile(const std::string &resource_path) {
     std::filesystem::path filePath = std::filesystem::path(resourceDirectory_ + resource_path).lexically_normal();
 
     if (!std::filesystem::is_regular_file(filePath)) {
-        Log::warn("Invalid resource location: '%s'", filePath.c_str());
+        Log::warn("Invalid resource location: '%'", filePath);
         return false;
     }
 
     if (modelDatas_.find(resource_path) != modelDatas_.end()) {
-        Log::warn("Tried to load already loaded resource: '%s'",  resource_path.c_str());
+        Log::warn("Tried to load already loaded resource: '%'",  resource_path);
         return false;
     }
 
@@ -68,7 +68,7 @@ bool ResourceManager::loadModelFromFile(const std::string &resource_path) {
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(), aiProcess_Triangulate);
     if (!scene) {
-        Log::warn("Failed to read resource '%s': %s", filePath.c_str(), importer.GetErrorString());
+        Log::warn("Failed to read resource '%': %", filePath, importer.GetErrorString());
         return false;
     }
 

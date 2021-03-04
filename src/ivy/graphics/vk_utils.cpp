@@ -120,7 +120,7 @@ std::vector<const char *> getInstanceExtensions() {
 
     // Fatal error if we requested an extension that isn't supported
     if (!unsupportedList.empty()) {
-        Log::fatal("The following instance extensions are not supported: %s", unsupportedList.c_str());
+        Log::fatal("The following instance extensions are not supported: %", unsupportedList);
     }
 
     return exts;
@@ -164,7 +164,7 @@ VkShaderModule loadShader(VkDevice device, const std::string &shader_path) {
         file.seekg(0);
         file.read(code.data(), size);
     } else {
-        Log::fatal("Failed to load shader '%s'", shader_path.c_str());
+        Log::fatal("Failed to load shader '%'", shader_path);
     }
 
     VkShaderModuleCreateInfo createInfo = {};
