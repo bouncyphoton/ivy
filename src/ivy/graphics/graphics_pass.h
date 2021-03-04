@@ -7,6 +7,7 @@
 #include "ivy/graphics/descriptor_set.h"
 #include <vulkan/vulkan.h>
 #include <unordered_map>
+#include <map>
 #include <vector>
 #include <optional>
 
@@ -93,7 +94,7 @@ public:
     inline static const char *SwapchainName = "__swapchain";
 
     explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
-                          const std::unordered_map<std::string, AttachmentInfo> &attachment_infos,
+                          const std::map<std::string, AttachmentInfo> &attachment_infos,
                           const std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> &descriptorSetLayouts)
         : renderPass_(render_pass), subpasses_(subpasses),
           attachmentInfos_(attachment_infos), descriptorSetLayouts_(descriptorSetLayouts) {}
@@ -117,9 +118,9 @@ public:
 
     /**
      * \brief Get the attachment infos for the graphics pass
-     * \return An unordered map with attachment names as the key and AttachmentInfo as the value
+     * \return A map with attachment names as the key and AttachmentInfo as the value
      */
-    [[nodiscard]] const std::unordered_map<std::string, AttachmentInfo> &getAttachmentInfos() const {
+    [[nodiscard]] const std::map<std::string, AttachmentInfo> &getAttachmentInfos() const {
         return attachmentInfos_;
     }
 
@@ -145,7 +146,7 @@ private:
 
     VkRenderPass renderPass_;
     std::vector<Subpass> subpasses_;
-    std::unordered_map<std::string, AttachmentInfo> attachmentInfos_;
+    std::map<std::string, AttachmentInfo> attachmentInfos_;
     std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
 };
 
@@ -307,7 +308,7 @@ private:
     };
 
     RenderDevice &device_;
-    std::unordered_map<std::string, AttachmentInfo> attachments_;
+    std::map<std::string, AttachmentInfo> attachments_;
     std::unordered_map<std::string, SubpassInfo> subpassInfos_;
     std::vector<std::string> subpassOrder_;
     std::vector<DependencyInfo> subpassDependencyInfo_;

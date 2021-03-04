@@ -601,7 +601,7 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
 
     // Create framebuffers if they don't exist
     if (framebuffers_[renderPass].size() != swapchainImageViews_.size()) {
-        const std::unordered_map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
+        const std::map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
 
         // Per in-flight frame
         for (VkImageView &swapchainImageView : swapchainImageViews_) {
