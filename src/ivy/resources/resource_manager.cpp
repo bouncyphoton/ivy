@@ -12,29 +12,6 @@ ResourceManager::ResourceManager(gfx::RenderDevice &render_device, const std::st
     if (!std::filesystem::is_directory(resourceDirectory_)) {
         Log::fatal("Invalid resource directory: '%'", resourceDirectory_);
     }
-
-    // Load default cube
-    loadModel("cube", {
-        gfx::Geometry(device_,
-        std::vector<gfx::VertexP3C3> {
-            gfx::VertexP3C3({-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}),
-            gfx::VertexP3C3({ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}),
-            gfx::VertexP3C3({-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}),
-            gfx::VertexP3C3({ 0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 0.0f}),
-
-            gfx::VertexP3C3({-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}),
-            gfx::VertexP3C3({ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}),
-            gfx::VertexP3C3({-0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}),
-            gfx::VertexP3C3({ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}),
-        }, std::vector<u32> {
-            0, 1, 2, 2, 1, 3,
-            2, 3, 4, 4, 3, 5,
-            4, 5, 6, 6, 5, 7,
-            6, 7, 0, 0, 7, 1,
-            1, 7, 3, 3, 7, 5,
-            6, 0, 4, 4, 0, 2
-        })
-    });
 }
 
 ModelResource ResourceManager::getModel(const std::string &model_name) {
@@ -66,7 +43,7 @@ bool ResourceManager::loadModelFromFile(const std::string &resource_path) {
     std::vector<gfx::Geometry> geometries;
 
     Assimp::Importer importer;
-    const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(), aiProcess_Triangulate);
+    const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(), aiProcess_Triangulate | aiProcess_GenNormals);
     if (!scene) {
         Log::warn("Failed to read resource '%': %", filePath, importer.GetErrorString());
         return false;
@@ -85,6 +62,11 @@ bool ResourceManager::loadModelFromFile(const std::string &resource_path) {
                                           mesh->mVertices[v].x,
                                           mesh->mVertices[v].y,
                                           mesh->mVertices[v].z),
+                                      glm::vec3(
+                                          mesh->mNormals[v].x,
+                                          mesh->mNormals[v].y,
+                                          mesh->mNormals[v].z
+                                      ),
                                       glm::vec3(1)
                                   ));
         }

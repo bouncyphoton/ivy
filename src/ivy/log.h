@@ -134,7 +134,7 @@ private:
 
     // Recursive print
     template<typename T, typename... Args>
-    static void printNext(std::ostream &stream, const std::string &original_format, T value, const Args & ... args) {
+    static void printNext(std::ostream &stream, const std::string &original_format, T value, const Args &... args) {
         size_t percentIdx = std::string::npos;
         std::string format = original_format;
 
@@ -146,7 +146,7 @@ private:
         // Find first unescaped %
         for (size_t i = 1; i < format.size(); ++i) {
             if (format[i] == '%') {
-                if (format[i-1] == '\\') {
+                if (format[i - 1] == '\\') {
                     // Remove backslash and continue
                     format.erase(i, 1);
                     --i;

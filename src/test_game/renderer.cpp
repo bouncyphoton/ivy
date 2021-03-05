@@ -16,6 +16,7 @@ struct MVP {
     alignas(16) glm::mat4 proj;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 model;
+    alignas(16) glm::mat4 normal;
 };
 
 Renderer::Renderer(gfx::RenderDevice &render_device)
@@ -35,7 +36,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
         gfx::GraphicsPassBuilder(device_)
         .addAttachmentSwapchain()
         .addAttachment("albedo", VK_FORMAT_R8G8B8A8_UNORM)
-        .addAttachment("position", VK_FORMAT_R16G16B16A16_SFLOAT)
+        .addAttachment("normal", VK_FORMAT_R16G16B16A16_SFLOAT)
         .addAttachment("depth", depthFormat)
         .addSubpass("gbuffer_pass",
                     gfx::SubpassBuilder()
@@ -43,7 +44,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/gbuffer.frag.spv")
                     .addVertexDescription(gfx::VertexP3C3::getBindingDescriptions(), gfx::VertexP3C3::getAttributeDescriptions())
                     .addColorAttachment("albedo", 0)
-                    .addColorAttachment("position", 1)
+                    .addColorAttachment("normal", 1)
                     .addDepthAttachment("depth")
                     .addDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
                     .build()
@@ -53,7 +54,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/lighting.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/lighting.frag.spv")
                     .addInputAttachment("albedo", 0, 0)
-                    .addInputAttachment("position", 0, 1)
+                    .addInputAttachment("normal", 0, 1)
                     .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
                     .build()
                    )
@@ -117,8 +118,9 @@ void Renderer::render(const std::vector<Entity> &entities) {
                 Model *model         = entity.getComponent<Model>();
 
                 if (transform && model) {
-                    // Set the model matrix
+                    // Set the model and normal matrix
                     mvpData.model = transform->getModelMatrix();
+                    mvpData.normal = glm::inverse(glm::transpose(mvpData.model));
 
                     // Put MVP data in a descriptor set and bind it
                     gfx::DescriptorSet mvpSet(pass, subpassIdx, 0);
@@ -142,7 +144,7 @@ void Renderer::render(const std::vector<Entity> &entities) {
             // Set our input attachments in descriptor set and bind it
             gfx::DescriptorSet inputAttachmentsSet(pass, subpassIdx, 0);
             inputAttachmentsSet.setInputAttachment(0, "albedo");
-            inputAttachmentsSet.setInputAttachment(1, "position");
+            inputAttachmentsSet.setInputAttachment(1, "normal");
             cmd.setDescriptorSet(device_, pass, inputAttachmentsSet);
 
             // Draw our fullscreen triangle

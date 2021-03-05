@@ -10,8 +10,8 @@ namespace ivy::gfx {
  */
 class VertexP3C3 {
 public:
-    VertexP3C3(glm::vec3 position, glm::vec3 color)
-        : position_(position), color_(color) {}
+    VertexP3C3(glm::vec3 position, glm::vec3 normal, glm::vec3 color)
+        : position_(position), normal_(normal), color_(color) {}
 
     static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
         std::vector<VkVertexInputBindingDescription> bindings;
@@ -27,17 +27,24 @@ public:
     static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
         std::vector<VkVertexInputAttributeDescription> attributes;
 
-        // pos
+        // position
         attributes.emplace_back();
         attributes.back().binding = 0;
         attributes.back().location = 0;
         attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
         attributes.back().offset = offsetof(VertexP3C3, position_);
 
-        // color
+        // normal
         attributes.emplace_back();
         attributes.back().binding = 0;
         attributes.back().location = 1;
+        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3C3, normal_);
+
+        // color
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 2;
         attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
         attributes.back().offset = offsetof(VertexP3C3, color_);
 
@@ -46,6 +53,7 @@ public:
 
 private:
     glm::vec3 position_;
+    glm::vec3 normal_;
     glm::vec3 color_;
 };
 
