@@ -8,7 +8,7 @@ The goal is to create a Vulkan renderer frontend that is easy to use and hard to
 
 ### Example code
 
-The following example code is for a very simple deferred renderer.
+Below is example code for a simple deferred renderer. For a full working example [look here](src/test_game/renderer.cpp) 
 
 **Renderer initialization code**
 ```c++
@@ -19,13 +19,14 @@ passes_.emplace_back(
     .addAttachmentSwapchain()
     .addAttachment("albedo", VK_FORMAT_R8G8B8A8_UNORM)
     .addAttachment("position", VK_FORMAT_R16G16B16A16_SFLOAT)
+    .addAttachment("depth", VK_FORMAT_D32_SFLOAT)
     
     // Add our gbuffer subpass
     .addSubpass("gbuffer_pass",
         gfx::SubpassBuilder()
         // Add shaders to our gbuffer subpass
-        .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/gbuffer.vert.spv")
-        .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/gbuffer.frag.spv")
+        .addShader(gfx::Shader::StageEnum::VERTEX, "gbuffer.vert.spv")
+        .addShader(gfx::Shader::StageEnum::FRAGMENT, "gbuffer.frag.spv")
         
         // Add a vertex description
         .addVertexDescription(gfx::VertexP3C3::getBindingDescriptions(), gfx::VertexP3C3::getAttributeDescriptions())
@@ -33,9 +34,10 @@ passes_.emplace_back(
         // Output color to our albedo (at location 0) and position (at location 1) attachments
         .addColorAttachment("albedo", 0)
         .addColorAttachment("position", 1)
+        .addDepthAttachment("depth", 2)
         
-        // Add a descriptor to our subpass (in set 0, binding 0)
-        .addDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+        // Add a uniform buffer to our subpass (in set 0, binding 0)
+        .addUniformBuffer(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
         .build()
     )
     
@@ -43,15 +45,17 @@ passes_.emplace_back(
     .addSubpass("lighting_pass",
         gfx::SubpassBuilder()
         // Shaders
-        .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/lighting.vert.spv")
-        .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/lighting.frag.spv")
-        
-        // Input attachments from previous subpass (in set 0 and bindings 0 and 1 respectively)
-        .addInputAttachment("albedo", 0, 0)
-        .addInputAttachment("position", 0, 1)
-        
+        .addShader(gfx::Shader::StageEnum::VERTEX, "lighting.vert.spv")
+        .addShader(gfx::Shader::StageEnum::FRAGMENT, "lighting.frag.spv")
+
         // Output color to swapchain at location 0
         .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
+        
+        // Input attachments from previous subpass (in set 0 and bindings 0, 1, and 2 respectively)
+        .addInputAttachment(0, 0, "albedo")
+        .addInputAttachment(0, 1, "position")
+        .addInputAttachment(0, 2, "depth")
+        
         .build()
     )
     
@@ -75,8 +79,8 @@ passes_.emplace_back(
 ```c++
 gfx::VertexP3C3 vertices[] = {
     gfx::VertexP3C3({ 0.0f, -0.5f,  0.0f}, {1.0f, 0.0f, 0.0f}),
-    gfx::VertexP3C3({ 0.5f,  0.5f,  0.0f}, {0.0f, 1.0f, 0.0f}),
-    gfx::VertexP3C3({-0.5f,  0.5f,  0.0f}, {0.0f, 0.0f, 1.0f})
+    gfx::VertexP3C3({ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}),
+    gfx::VertexP3C3({-0.5f,  0.5f, -1.0f}, {0.0f, 0.0f, 1.0f})
 };
 
 vertexBuffer_ = device_.createVertexBuffer(
@@ -95,6 +99,8 @@ gfx::GraphicsPass &pass = passes_.front();
 cmd.executeGraphicsPass(device_, pass, [&]() {
     u32 subpassIdx = 0;
 
+    f32 aspectRatio = 800.0f / 600.0f;
+    
     // Subpass 0, g-buffer
     {
         // Bind graphics pipeline
@@ -102,8 +108,8 @@ cmd.executeGraphicsPass(device_, pass, [&]() {
 
         // Set MVP data on CPU
         struct MVP {
-            alignas(16) glm::mat4 proj  = glm::perspective(glm::half_pi<f32>(), 800.0f / 600.0f, 0.01f, 100.0f);
-            alignas(16) glm::mat4 view  = glm::lookAt(glm::vec3(0, 0, 2), glm::vec3(0), glm::vec3(0, 1, 0));
+            alignas(16) glm::mat4 proj  = glm::perspective(glm::half_pi<f32>(), aspectRatio, 0.01f, 10.0f);
+            alignas(16) glm::mat4 view  = glm::lookAt(glm::vec3(0), glm::vec3(0, 0, -1), glm::vec3(0, 1, 0));
             alignas(16) glm::mat4 model = glm::translate(glm::mat4(1), glm::vec3(0, std::sin(glfwGetTime()), 0));
         } mvpData;
 
@@ -129,6 +135,7 @@ cmd.executeGraphicsPass(device_, pass, [&]() {
         gfx::DescriptorSet inputAttachmentsSet(pass, subpassIdx, 0);
         inputAttachmentsSet.setInputAttachment(0, "albedo");
         inputAttachmentsSet.setInputAttachment(1, "position");
+        inputAttachmentsSet.setInputAttachment(2, "depth");
         cmd.setDescriptorSet(device_, pass, inputAttachmentsSet);
 
         // Draw our fullscreen triangle
