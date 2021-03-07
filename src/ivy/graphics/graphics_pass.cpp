@@ -224,7 +224,7 @@ GraphicsPass GraphicsPassBuilder::build() {
     std::vector<Subpass> subpasses;
 
     // A table of DescriptorSetLayouts for the final GraphicsPass, <subpass, set, layout>
-    std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> descriptorSetLayouts;
+    std::map<u32, std::map<u32, DescriptorSetLayout>> descriptorSetLayouts;
 
     // Go over each subpass
     for (u32 subpassIdx = 0; subpassIdx < subpassOrder_.size(); ++subpassIdx) {
@@ -237,7 +237,7 @@ GraphicsPass GraphicsPassBuilder::build() {
         // Create DescriptorSetLayouts for GraphicsPass
         for (const auto &descriptorSet : subpassInfo.descriptors_) {
             u32 setIdx = descriptorSet.first;
-            const std::unordered_map<u32, VkDescriptorSetLayoutBinding> &bindings = descriptorSet.second;
+            const std::map<u32, VkDescriptorSetLayoutBinding> &bindings = descriptorSet.second;
 
             // Turn bindings map into a vector
             std::vector<VkDescriptorSetLayoutBinding> bindingsVector;
@@ -376,9 +376,14 @@ SubpassBuilder &SubpassBuilder::addVertexDescription(const std::vector<VkVertexI
     return *this;
 }
 
-SubpassBuilder &SubpassBuilder::addInputAttachment(const std::string &attachment_name, u32 set, u32 binding) {
+SubpassBuilder &SubpassBuilder::addInputAttachment(u32 set, u32 binding, const std::string &attachment_name) {
     subpass_.inputAttachmentNames_.emplace_back(attachment_name);
     addDescriptor(set, binding, VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::addUniformBuffer(u32 set, u32 binding, VkShaderStageFlags stage_flags) {
+    addDescriptor(set, binding, stage_flags, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     return *this;
 }
 

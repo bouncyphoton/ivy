@@ -19,6 +19,12 @@ struct MVP {
     alignas(16) glm::mat4 normal;
 };
 
+struct LightingPerFrame {
+    alignas(16) glm::mat4 invProj;
+    alignas(16) glm::mat4 invView;
+    alignas(16) glm::vec2 resolution;
+};
+
 Renderer::Renderer(gfx::RenderDevice &render_device)
     : device_(render_device) {
     LOG_CHECKPOINT();
@@ -46,16 +52,18 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addColorAttachment("albedo", 0)
                     .addColorAttachment("normal", 1)
                     .addDepthAttachment("depth")
-                    .addDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+                    .addUniformBuffer(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
                     .build()
                    )
         .addSubpass("lighting_pass",
                     gfx::SubpassBuilder()
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/lighting.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/lighting.frag.spv")
-                    .addInputAttachment("albedo", 0, 0)
-                    .addInputAttachment("normal", 0, 1)
                     .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
+                    .addInputAttachment(0, 0, "albedo")
+                    .addInputAttachment(0, 1, "normal")
+                    .addInputAttachment(0, 2, "depth")
+                    .addUniformBuffer(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build()
                    )
         .addSubpassDependency(gfx::GraphicsPass::SwapchainName, "gbuffer_pass",
@@ -84,17 +92,19 @@ void Renderer::render(const std::vector<Entity> &entities) {
     cmd.executeGraphicsPass(device_, pass, [&]() {
         u32 subpassIdx = 0;
 
+        // This data will be used in multiple subpasses
+        MVP mvpData = {};
+        // TODO: get width and height from output attachment
+        f32 frameWidth = device_.getSwapchainExtent().width;
+        f32 frameHeight = device_.getSwapchainExtent().height;
+        f32 aspectRatio = frameWidth / frameHeight;
+
         // Subpass 0, g-buffer
         {
             // Bind graphics pipeline
             cmd.bindGraphicsPipeline(pass, subpassIdx);
 
-            // TODO: it would make sense to separate per-frame and per-draw descriptor sets
-            // TODO: get aspect ratio for output attachment
-            f32 aspectRatio = device_.getSwapchainExtent().width / (f32) device_.getSwapchainExtent().height;
-
             // Set MVP data on CPU
-            MVP mvpData = {};
             mvpData.proj = glm::mat4(1);
             mvpData.view = glm::mat4(1);
 
@@ -142,10 +152,25 @@ void Renderer::render(const std::vector<Entity> &entities) {
             cmd.bindGraphicsPipeline(pass, subpassIdx);
 
             // Set our input attachments in descriptor set and bind it
-            gfx::DescriptorSet inputAttachmentsSet(pass, subpassIdx, 0);
-            inputAttachmentsSet.setInputAttachment(0, "albedo");
-            inputAttachmentsSet.setInputAttachment(1, "normal");
-            cmd.setDescriptorSet(device_, pass, inputAttachmentsSet);
+            {
+                gfx::DescriptorSet inputAttachmentsSet(pass, subpassIdx, 0);
+                inputAttachmentsSet.setInputAttachment(0, "albedo");
+                inputAttachmentsSet.setInputAttachment(1, "normal");
+                inputAttachmentsSet.setInputAttachment(2, "depth");
+                cmd.setDescriptorSet(device_, pass, inputAttachmentsSet);
+            }
+
+            // Set per frame descriptors
+            {
+                LightingPerFrame perFrame = {};
+                perFrame.invProj = glm::inverse(mvpData.proj);
+                perFrame.invView = glm::inverse(mvpData.view);
+                perFrame.resolution = glm::vec2(frameWidth, frameHeight);
+
+                gfx::DescriptorSet perFrameSet(pass, subpassIdx, 1);
+                perFrameSet.setUniformBuffer(0, perFrame);
+                cmd.setDescriptorSet(device_, pass, perFrameSet);
+            }
 
             // Draw our fullscreen triangle
             cmd.draw(3, 1, 0, 0);

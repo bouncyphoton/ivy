@@ -18,7 +18,7 @@ class RenderDevice;
 // TODO: push constants
 
 // <set, <binding, VkDescriptorSetLayoutBinding>>
-using LayoutBindingsMap_t = std::unordered_map<u32, std::unordered_map<u32, VkDescriptorSetLayoutBinding>>;
+using LayoutBindingsMap_t = std::map<u32, std::map<u32, VkDescriptorSetLayoutBinding>>;
 
 /**
  * \brief Holds pipeline and set layouts for a subpass
@@ -95,7 +95,7 @@ public:
 
     explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
                           const std::map<std::string, AttachmentInfo> &attachment_infos,
-                          const std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> &descriptorSetLayouts)
+                          const std::map<u32, std::map<u32, DescriptorSetLayout>> &descriptorSetLayouts)
         : renderPass_(render_pass), subpasses_(subpasses),
           attachmentInfos_(attachment_infos), descriptorSetLayouts_(descriptorSetLayouts) {}
 
@@ -147,7 +147,7 @@ private:
     VkRenderPass renderPass_;
     std::vector<Subpass> subpasses_;
     std::map<std::string, AttachmentInfo> attachmentInfos_;
-    std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
+    std::map<u32, std::map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
 };
 
 /**
@@ -193,12 +193,21 @@ public:
 
     /**
      * \brief Add an input attachment to the subpass
-     * \param attachment_name Name of the attachment that should be an input
      * \param set Which descriptor set the input attachment should belong to
      * \param binding Which binding in the descriptor set the input attachment should belong to
+     * \param attachment_name Name of the attachment that should be an input
      * \return SubpassBuilder
      */
-    SubpassBuilder &addInputAttachment(const std::string &attachment_name, u32 set, u32 binding);
+    SubpassBuilder &addInputAttachment(u32 set, u32 binding, const std::string &attachment_name);
+
+    /**
+     * \brief Add a uniform buffer to the subpass
+     * \param set Which descriptor set the input attachment should belong to
+     * \param binding Which binding in the descriptor set the input attachment should belong to
+     * \param stage_flags Which shader stage the descriptor set belongs to
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &addUniformBuffer(u32 set, u32 binding, VkShaderStageFlags stage_flags);
 
     /**
      * \brief Add a color attachment to the subpass
@@ -215,6 +224,15 @@ public:
      */
     SubpassBuilder &addDepthAttachment(const std::string &attachment_name);
 
+    // TODO: make this private, only allow adding of descriptors via functions like addInputAttachment
+
+    /**
+     * \brief Build the subpass
+     * \return SubpassInfo
+     */
+    SubpassInfo build();
+
+private:
     /**
      * \brief Add a descriptor to the subpass
      * \param set The descriptor set index
@@ -225,13 +243,6 @@ public:
      */
     SubpassBuilder &addDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags, VkDescriptorType type);
 
-    /**
-     * \brief Build the subpass
-     * \return SubpassInfo
-     */
-    SubpassInfo build();
-
-private:
     SubpassInfo subpass_;
 };
 
