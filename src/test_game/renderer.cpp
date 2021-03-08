@@ -97,8 +97,8 @@ void Renderer::render(const std::vector<Entity> &entities) {
         // This data will be used in multiple subpasses
         MVP mvpData = {};
         // TODO: get width and height from output attachment
-        f32 frameWidth = device_.getSwapchainExtent().width;
-        f32 frameHeight = device_.getSwapchainExtent().height;
+        f32 frameWidth = static_cast<f32>(device_.getSwapchainExtent().width);
+        f32 frameHeight = static_cast<f32>(device_.getSwapchainExtent().height);
         f32 aspectRatio = frameWidth / frameHeight;
 
         // Subpass 0, g-buffer

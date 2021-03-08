@@ -20,7 +20,8 @@ target_link_libraries(ivy Vulkan::Vulkan)
 
 # Vulkan Memory Allocator (VMA)
 # Include as system to ignore warnings
-include_directories(SYSTEM external/VulkanMemoryAllocator/src)
+SET(VMA_SRC ${PROJECT_SOURCE_DIR}/external/VulkanMemoryAllocator/src)
+include_directories(SYSTEM ${VMA_SRC})
 
 # GLM
 target_include_directories(ivy PRIVATE external/glm)
@@ -28,6 +29,7 @@ add_compile_definitions(GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_SILENT_WARNINGS)
 
 # Assimp
 set(BUILD_SHARED_LIBS off)
+set(ASSIMP_NO_EXPORT on)
 add_subdirectory(external/assimp)
 target_link_libraries(ivy assimp)
 
@@ -39,6 +41,8 @@ include_directories(SYSTEM external/stb)
 if (MSVC)
     # Treat warnings as errors
     target_compile_options(ivy PRIVATE /W4 /WX)
+
+    target_compile_options(ivy PRIVATE /experimental:external /external:W0 /external:I ${VMA_SRC})
 else()
     # Treat warnings as errors
     target_compile_options(ivy PRIVATE -Wall -Wextra -pedantic -Werror)

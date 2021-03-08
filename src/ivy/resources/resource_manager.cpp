@@ -136,7 +136,7 @@ bool ResourceManager::loadTextureFromFile(const std::string &texture_path) {
 
     // Read image
     i32 width, height;
-    u8 *data = stbi_load(filePath.c_str(), &width, &height, nullptr, 4);
+    u8 *data = stbi_load(filePath.string().c_str(), &width, &height, nullptr, 4);
     if (!data) {
         return false;
     }
