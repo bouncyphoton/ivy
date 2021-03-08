@@ -20,28 +20,37 @@ namespace ivy {
  */
 class Log final {
 public:
+    enum class LogLevel {
+        VERBOSE,
+        DEBUG,
+        INFO,
+        WARN
+    };
+
+    inline static LogLevel logLevel;
+
     /**
-     * \brief Log an informational message
-     * \param msg The message to log
+     * \brief Log a verbose message
+     * \param message The message to log
      */
-    static void info(const std::string &message) {
-        info("%", message);
+    static void verbose(const std::string &message) {
+        verbose("%", message);
     }
 
     /**
-     * \brief Log an informational message with % syntax
+     * \brief Log a verbose message with % syntax
      * Example: ("%, %", 4, "hello") -> "4, hello"
      * \tparam Args Arguments
      * \param format Message format
      * \param args Argument list for message
      */
     template<typename ... Args>
-    static void info(const std::string &format, const Args &... args) {
-        std::ostream &stream = std::cout;
+    static void verbose(const std::string &format, const Args &... args) {
+        if (Log::logLevel > LogLevel::VERBOSE) {
+            return;
+        }
 
-        stream << "[" << get_date_time_as_string() << "][info] ";
-        printNext(stream, format, args...);
-        stream << std::endl;
+        printGeneric("verbose", std::cout, format, args...);
     }
 
     /**
@@ -61,11 +70,35 @@ public:
      */
     template<typename ... Args>
     static void debug(const std::string &format, const Args &... args) {
-        std::ostream &stream = std::cout;
+        if (Log::logLevel > LogLevel::DEBUG) {
+            return;
+        }
 
-        stream << "[" << get_date_time_as_string() << "][debug] ";
-        printNext(stream, format, args...);
-        stream << std::endl;
+        printGeneric("debug", std::cout, format, args...);
+    }
+
+    /**
+     * \brief Log an informational message
+     * \param msg The message to log
+     */
+    static void info(const std::string &message) {
+        info("%", message);
+    }
+
+    /**
+     * \brief Log an informational message with % syntax
+     * Example: ("%, %", 4, "hello") -> "4, hello"
+     * \tparam Args Arguments
+     * \param format Message format
+     * \param args Argument list for message
+     */
+    template<typename ... Args>
+    static void info(const std::string &format, const Args &... args) {
+        if (Log::logLevel > LogLevel::INFO) {
+            return;
+        }
+
+        printGeneric("info", std::cout, format, args...);
     }
 
     /**
@@ -85,11 +118,11 @@ public:
      */
     template<typename ... Args>
     static void warn(const std::string &format, const Args &... args) {
-        std::ostream &stream = std::cerr;
+        if (Log::logLevel > LogLevel::WARN) {
+            return;
+        }
 
-        stream << "[" << get_date_time_as_string() << "][warn] ";
-        printNext(stream, format, args...);
-        std::cerr << std::endl;
+        printGeneric("warn", std::cerr, format, args...);
     }
 
     /**
@@ -109,15 +142,19 @@ public:
      */
     template<typename ... Args>
     [[noreturn]] static void fatal(const std::string &format, const Args &... args) {
-        std::ostream &stream = std::cerr;
-
-        stream << "[" << get_date_time_as_string() << "][fatal] ";
-        printNext(stream, format, args...);
-        stream << std::endl;
+        printGeneric("fatal", std::cerr, format, args...);
         exit(1);
     }
 
 private:
+
+    template<typename ... Args>
+    static void printGeneric(const std::string &type, std::ostream &stream, const std::string &format,
+                             const Args &... args) {
+        stream << "[" << get_date_time_as_string() << "][" << type << "] ";
+        printNext(stream, format, args...);
+        stream << std::endl;
+    }
 
     // Base case
     static void printNext(std::ostream &stream, const std::string &original_format) {

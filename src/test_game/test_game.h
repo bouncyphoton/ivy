@@ -21,6 +21,8 @@ private:
     ivy::Engine engine_;
     Renderer renderer_;
     std::vector<ivy::Entity> entities_;
+
+    Renderer::DebugMode debugMode_ = Renderer::DebugMode::FULL;
 };
 
 #endif // IVY_TEST_GAME_H

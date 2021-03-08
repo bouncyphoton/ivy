@@ -14,6 +14,11 @@ using namespace ivy;
 
 TestGame::TestGame()
     : engine_(getOptions()), renderer_(engine_.getRenderDevice()) {
+
+    // Set logging level
+    Log::logLevel = Log::LogLevel::DEBUG;
+
+    // Run engine with our init, update and render
     engine_.run(
     [&]() {
         init();
@@ -56,6 +61,24 @@ void TestGame::update() {
     // Exit on escape
     if (platform.getInputState().isKeyPressed(GLFW_KEY_ESCAPE)) {
         engine_.stop();
+    }
+
+    // Set debug render mode
+    if (input.isKeyPressed(GLFW_KEY_1)) {
+        debugMode_ = Renderer::DebugMode::FULL;
+        Log::debug("Rendering with full shading");
+    } else if (input.isKeyPressed(GLFW_KEY_2)) {
+        debugMode_ = Renderer::DebugMode::DIFFUSE;
+        Log::debug("Rendering diffuse gbuffer");
+    }  else if (input.isKeyPressed(GLFW_KEY_3)) {
+        debugMode_ = Renderer::DebugMode::NORMAL;
+        Log::debug("Rendering normal gbuffer");
+    }  else if (input.isKeyPressed(GLFW_KEY_4)) {
+        debugMode_ = Renderer::DebugMode::WORLD;
+        Log::debug("Rendering derived world position");
+    }  else if (input.isKeyPressed(GLFW_KEY_5)) {
+        debugMode_ = Renderer::DebugMode::DEPTH;
+        Log::debug("Rendering depth");
     }
 
     // Update entities
@@ -120,7 +143,7 @@ void TestGame::update() {
 }
 
 void TestGame::render() {
-    renderer_.render(entities_);
+    renderer_.render(entities_, debugMode_);
 }
 
 Options TestGame::getOptions() {

@@ -12,13 +12,20 @@
  */
 class Renderer final {
 public:
+    /**
+     * \brief Debug rendering mode
+     */
+    enum class DebugMode {
+        FULL, DIFFUSE, NORMAL, WORLD, DEPTH
+    };
+
     explicit Renderer(ivy::gfx::RenderDevice &render_device);
     ~Renderer();
 
     /**
      * \brief Render a frame
      */
-    void render(const std::vector<ivy::Entity> &entities);
+    void render(const std::vector<ivy::Entity> &entities, DebugMode debug_mode = DebugMode::FULL);
 
 private:
     ivy::gfx::RenderDevice &device_;

@@ -316,17 +316,15 @@ void RenderDevice::endFrame() {
     // Debug stats for this frame
     //----------------------------------
 
-    if constexpr (consts::DEBUG) {
-        Log::debug("+-- Frame stats for % -----------", swapImageIndex_);
-        Log::debug("| %/% bytes (%\\%) of the buffer were used for uniform buffers",
-                   uniformBufferOffsets_[swapImageIndex_], uniformBufferSize_,
-                   100.0f * (uniformBufferOffsets_[swapImageIndex_] / (f32)uniformBufferSize_));
-        Log::debug("| %/% descriptor sets were used this frame",
-                   descriptorSetCaches_[swapImageIndex_].countNumUsed(), maxSets_);
-        Log::debug("| % descriptor sets are cached for this frame",
-                   descriptorSetCaches_[swapImageIndex_].countTotalCached());
-        Log::debug("+-------------------------------");
-    }
+    Log::verbose("+-- Frame stats for % -----------", swapImageIndex_);
+    Log::verbose("| %/% bytes (%\\%) of the buffer were used for uniform buffers",
+                 uniformBufferOffsets_[swapImageIndex_], uniformBufferSize_,
+                 100.0f * (uniformBufferOffsets_[swapImageIndex_] / (f32)uniformBufferSize_));
+    Log::verbose("| %/% descriptor sets were used this frame",
+                 descriptorSetCaches_[swapImageIndex_].countNumUsed(), maxSets_);
+    Log::verbose("| % descriptor sets are cached for this frame",
+                 descriptorSetCaches_[swapImageIndex_].countTotalCached());
+    Log::verbose("+-------------------------------");
 
     //----------------------------------
     // Queue submission and sync
@@ -868,10 +866,8 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &layout;
 
-        if (consts::DEBUG) {
-            Log::debug("Allocating new descriptor set for frame %, subpass %, set %",
-                       swapImageIndex_, subpassIdx, setIdx);
-        }
+        Log::verbose("Allocating new descriptor set for frame %, subpass %, set %", swapImageIndex_, subpassIdx, setIdx);
+
         // TODO: handle case where we can't allocate new descriptor set
         VK_CHECKF(vkAllocateDescriptorSets(device_, &allocInfo, &dstSet));
 

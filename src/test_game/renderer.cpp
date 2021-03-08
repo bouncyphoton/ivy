@@ -22,7 +22,8 @@ struct MVP {
 struct LightingPerFrame {
     alignas(16) glm::mat4 invProj;
     alignas(16) glm::mat4 invView;
-    alignas(16) glm::vec2 resolution;
+    alignas(8) glm::vec2 resolution;
+    alignas(4) u32 debugMode;
 };
 
 Renderer::Renderer(gfx::RenderDevice &render_device)
@@ -86,7 +87,7 @@ Renderer::~Renderer() {
     LOG_CHECKPOINT();
 }
 
-void Renderer::render(const std::vector<Entity> &entities) {
+void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode) {
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
     gfx::GraphicsPass &pass = passes_.front();
@@ -177,6 +178,7 @@ void Renderer::render(const std::vector<Entity> &entities) {
                 perFrame.invProj = glm::inverse(mvpData.proj);
                 perFrame.invView = glm::inverse(mvpData.view);
                 perFrame.resolution = glm::vec2(frameWidth, frameHeight);
+                perFrame.debugMode = static_cast<u32>(debug_mode);
 
                 gfx::DescriptorSet perFrameSet(pass, subpassIdx, 1);
                 perFrameSet.setUniformBuffer(0, perFrame);

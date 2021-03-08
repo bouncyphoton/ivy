@@ -11,7 +11,14 @@ layout (set = 1, binding = 0) uniform PerFrame {
     mat4 invProjection;
     mat4 invView;
     vec2 resolution;
+    uint debugMode;
 } uFrame;
+
+const uint DEBUG_FULL    = 0;
+const uint DEBUG_DIFFUSE = 1;
+const uint DEBUG_NORMAL  = 2;
+const uint DEBUG_WORLD   = 3;
+const uint DEBUG_DEPTH   = 4;
 
 void main() {
     // Given variables
@@ -28,11 +35,27 @@ void main() {
     vec3 viewPos  = uFrame.invView[3].xyz;
     vec3 viewDir  = normalize(worldPos - viewPos);
 
-    // TODO: remove temp hacks
-    float ambient = 0.1f;
-    vec3 sunDir = normalize(vec3(1));
+    vec3 color = vec3(0);
+    switch (uFrame.debugMode) {
+        case DEBUG_FULL:
+            // TODO: remove temp hacks
+            float ambient = 0.1f;
+            vec3 sunDir = normalize(vec3(1));
+            color = max(ambient, dot(normal, sunDir)) * diffuse;
+            break;
+        case DEBUG_DIFFUSE:
+            color = diffuse;
+            break;
+        case DEBUG_NORMAL:
+            color = normal * 0.5 + 0.5;
+            break;
+        case DEBUG_WORLD:
+            color = fract(worldPos);
+            break;
+        case DEBUG_DEPTH:
+            color = vec3(depth);
+            break;
+    }
 
-    // Shade
-    vec3 color = max(ambient, dot(normal, sunDir)) * diffuse;
     oFragColor = vec4(color, 1);
 }
