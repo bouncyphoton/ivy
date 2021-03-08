@@ -129,6 +129,32 @@ public:
     VkBuffer createIndexBuffer(const void *data, VkDeviceSize size);
 
     /**
+     * \brief Create an image on the GPU using given image data with the lifetime of the render device
+     * \param width Width of the image
+     * \param height Height of the image
+     * \param format Format of the image
+     * \param data Pixel data
+     * \param size Size of pixel data in bytes
+     * \return VkImage and VkImageView pair
+     */
+    std::pair<VkImage, VkImageView> createTextureGPUFromData(u32 width, u32 height, VkFormat format, const void *data,
+                                                             VkDeviceSize size);
+
+    /**
+     * \brief Create a sampler
+     * \param mag_filter Magnification filter
+     * \param min_filter Minification filter
+     * \param u_wrap Wrapping for u addressing
+     * \param v_wrap Wrapping for v addressing
+     * \param w_wrap Wrapping for w addressing
+     * \return VkSampler
+     */
+    VkSampler createSampler(VkFilter mag_filter, VkFilter min_filter,
+                            VkSamplerAddressMode u_wrap = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                            VkSamplerAddressMode v_wrap = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                            VkSamplerAddressMode w_wrap = VK_SAMPLER_ADDRESS_MODE_REPEAT);
+
+    /**
      * \brief Get a VkDescriptorSet with data specified in set for a graphics pass for the current frame
      * \param pass The associated graphics pass
      * \param set The set
@@ -164,7 +190,15 @@ private:
      * \param usage How the buffer will be used
      * \return VkBuffer
      */
-    VkBuffer createBuffer(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
+    VkBuffer createBufferGPU(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
+
+    /**
+     * \brief Create a staging src buffer on the CPU, you need to destroy this yourself with vmaDestroyBuffer
+     * \param data Pointer to the data
+     * \param size Size of the buffer in bytes
+     * \return VkBuffer
+     */
+    std::pair<VkBuffer, VmaAllocation> createStagingBufferCPU(const void *data, VkDeviceSize size);
 
     const Options options_;
 
@@ -204,6 +238,7 @@ private:
 
     std::vector<VkDescriptorPool> pools_;
     std::vector<DescriptorSetCache> descriptorSetCaches_;
+    u32 maxSets_ = 256;
 
     std::vector<VkBuffer> uniformBuffers_;
     std::vector<VkDeviceSize> uniformBufferOffsets_;

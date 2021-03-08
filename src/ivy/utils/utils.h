@@ -1,6 +1,7 @@
 #ifndef IVY_UTILS_H
 #define IVY_UTILS_H
 
+#include <glm/glm.hpp>
 #include <string>
 
 namespace ivy {

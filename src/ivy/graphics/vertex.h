@@ -6,19 +6,19 @@
 namespace ivy::gfx {
 
 /**
- * \brief A vertex with a position (3 components) and color (3 components)
+ * \brief A vertex with a position (3 components), a normal (3 components) and texture coordinates (2 components)
  */
-class VertexP3C3 {
+class VertexP3N3UV2 {
 public:
-    VertexP3C3(glm::vec3 position, glm::vec3 normal, glm::vec3 color)
-        : position_(position), normal_(normal), color_(color) {}
+    VertexP3N3UV2(glm::vec3 position, glm::vec3 normal, glm::vec2 uv)
+        : position_(position), normal_(normal), uv_(uv) {}
 
     static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
         std::vector<VkVertexInputBindingDescription> bindings;
 
         bindings.emplace_back();
         bindings.back().binding = 0;
-        bindings.back().stride = sizeof(VertexP3C3);
+        bindings.back().stride = sizeof(VertexP3N3UV2);
         bindings.back().inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         return bindings;
@@ -32,21 +32,21 @@ public:
         attributes.back().binding = 0;
         attributes.back().location = 0;
         attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributes.back().offset = offsetof(VertexP3C3, position_);
+        attributes.back().offset = offsetof(VertexP3N3UV2, position_);
 
         // normal
         attributes.emplace_back();
         attributes.back().binding = 0;
         attributes.back().location = 1;
         attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributes.back().offset = offsetof(VertexP3C3, normal_);
+        attributes.back().offset = offsetof(VertexP3N3UV2, normal_);
 
-        // color
+        // uv
         attributes.emplace_back();
         attributes.back().binding = 0;
         attributes.back().location = 2;
-        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributes.back().offset = offsetof(VertexP3C3, color_);
+        attributes.back().format = VK_FORMAT_R32G32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3UV2, uv_);
 
         return attributes;
     }
@@ -54,7 +54,7 @@ public:
 private:
     glm::vec3 position_;
     glm::vec3 normal_;
-    glm::vec3 color_;
+    glm::vec2 uv_;
 };
 
 }

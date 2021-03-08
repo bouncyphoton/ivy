@@ -14,20 +14,25 @@ layout (set = 1, binding = 0) uniform PerFrame {
 } uFrame;
 
 void main() {
-    float depth = subpassLoad(iDepth).x;
+    // Given variables
+    float depth = subpassLoad(iDepth).r;
     if (depth == 1) {
         discard;
     }
+    vec3 albedo = subpassLoad(iAlbedo).rgb;
+    vec3 normal = normalize(subpassLoad(iNormal).xyz);
 
-    vec2 uv = vec2(gl_FragCoord.x, uFrame.resolution.y - gl_FragCoord.y) / uFrame.resolution;
+    // Derived variables
+    vec2 uv       = vec2(gl_FragCoord.x, uFrame.resolution.y - gl_FragCoord.y) / uFrame.resolution;
     vec3 worldPos = depthToWorldPos(uv, depth, uFrame.invProjection, uFrame.invView);
+    vec3 viewPos  = uFrame.invView[3].xyz;
+    vec3 viewDir  = normalize(worldPos - viewPos);
 
-    vec3 color = fract(worldPos);
+    // TODO: remove temp hacks
+    float ambient = 0.1f;
+    vec3 sunDir = normalize(vec3(1));
 
-    //vec3 albedo = subpassLoad(iAlbedo).rgb;
-    //vec3 normal = normalize(subpassLoad(iNormal).xyz);
-
-    //vec3 color = albedo * (normal * 0.5 + 0.5);
-
+    // Shade
+    vec3 color = max(ambient, dot(normal, sunDir)) * albedo;
     oFragColor = vec4(color, 1);
 }

@@ -9,7 +9,7 @@
 namespace ivy::gfx {
 
 /**
- * \brief Represents geometry for rendering
+ * \brief Holds geometry data for rendering
  */
 class Geometry {
 public:

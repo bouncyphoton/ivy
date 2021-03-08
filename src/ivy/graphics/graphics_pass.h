@@ -193,21 +193,30 @@ public:
 
     /**
      * \brief Add an input attachment to the subpass
-     * \param set Which descriptor set the input attachment should belong to
-     * \param binding Which binding in the descriptor set the input attachment should belong to
+     * \param set Which descriptor set the descriptor should belong to
+     * \param binding Which binding in the descriptor set the descriptor should belong to
      * \param attachment_name Name of the attachment that should be an input
      * \return SubpassBuilder
      */
-    SubpassBuilder &addInputAttachment(u32 set, u32 binding, const std::string &attachment_name);
+    SubpassBuilder &addInputAttachmentDescriptor(u32 set, u32 binding, const std::string &attachment_name);
 
     /**
      * \brief Add a uniform buffer to the subpass
-     * \param set Which descriptor set the input attachment should belong to
-     * \param binding Which binding in the descriptor set the input attachment should belong to
+     * \param set Which descriptor set the descriptor should belong to
+     * \param binding Which binding in the descriptor set the descriptor should belong to
      * \param stage_flags Which shader stage the descriptor set belongs to
      * \return SubpassBuilder
      */
-    SubpassBuilder &addUniformBuffer(u32 set, u32 binding, VkShaderStageFlags stage_flags);
+    SubpassBuilder &addUniformBufferDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags);
+
+    /**
+     * \brief Add a texture to sample to the subpass
+     * \param set Which descriptor set the descriptor should belong to
+     * \param binding Which binding in the descriptor set the descriptor should belong to
+     * \param stage_flags Which shader stage the descriptor set belongs to
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &addTextureDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags);
 
     /**
      * \brief Add a color attachment to the subpass

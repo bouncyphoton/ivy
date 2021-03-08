@@ -1,28 +1,14 @@
 #ifndef IVY_MODEL_RESOURCE_H
 #define IVY_MODEL_RESOURCE_H
 
-#include "ivy/graphics/command_buffer.h"
-#include "ivy/graphics/geometry.h"
-#include "ivy/graphics/vertex.h"
+#include "ivy/resources/resource.h"
+#include "ivy/graphics/mesh.h"
+#include <vector>
 
 namespace ivy {
 
-/**
- * \brief A handle for mesh datas on the GPU
- */
-class ModelResource {
-public:
-    void draw(gfx::CommandBuffer &cmd) const;
-
-private:
-    friend class ResourceManager;
-
-    explicit ModelResource(const std::vector<gfx::Geometry> &geometries);
-
-    const std::vector<gfx::Geometry> &geometries_;
-    // TODO: material
-};
+using ModelResource = Resource<std::vector<gfx::Mesh>>;
 
 }
 
-#endif // IVY_MODEL_RESOURCE_H
+#endif //IVY_MODEL_RESOURCE_H

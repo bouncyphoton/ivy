@@ -103,4 +103,26 @@ void CommandBuffer::copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, Vk
     vkCmdCopyBuffer(commandBuffer_, src, dst, 1, &region);
 }
 
+void CommandBuffer::copyBufferToImage(VkBuffer src, VkImage dst, VkImageLayout dst_layout,
+                                      VkImageAspectFlags image_aspect, u32 width, u32 height, u32 depth) {
+    VkBufferImageCopy region = {};
+    region.imageSubresource.aspectMask = image_aspect;
+    region.imageSubresource.layerCount = 1;
+    region.imageExtent = {width, height, depth};
+
+    vkCmdCopyBufferToImage(commandBuffer_, src, dst, dst_layout, 1, &region);
+}
+
+void CommandBuffer::pipelineBarrier(VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage,
+                                    VkDependencyFlags dependency, u32 num_memory_barriers,
+                                    const VkMemoryBarrier *memory_barriers, u32 num_buffer_memory_barriers,
+                                    const VkBufferMemoryBarrier *buffer_memory_barriers,
+                                    u32 num_image_memory_barriers,
+                                    const VkImageMemoryBarrier *image_memory_barriers) {
+    vkCmdPipelineBarrier(commandBuffer_, src_stage, dst_stage, dependency,
+                         num_memory_barriers, memory_barriers,
+                         num_buffer_memory_barriers, buffer_memory_barriers,
+                         num_image_memory_barriers, image_memory_barriers);
+}
+
 }

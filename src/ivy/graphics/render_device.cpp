@@ -212,10 +212,13 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     poolSizes.emplace_back(VkDescriptorPoolSize{
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, limits_.maxDescriptorSetUniformBuffers * 2
     });
+    poolSizes.emplace_back(VkDescriptorPoolSize{
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, limits_.maxDescriptorSetSampledImages * 2
+    });
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
     descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolCreateInfo.maxSets = 128;
+    descriptorPoolCreateInfo.maxSets = maxSets_;
     descriptorPoolCreateInfo.poolSizeCount = (u32) poolSizes.size();
     descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
@@ -318,8 +321,8 @@ void RenderDevice::endFrame() {
         Log::debug("| %/% bytes (%\\%) of the buffer were used for uniform buffers",
                    uniformBufferOffsets_[swapImageIndex_], uniformBufferSize_,
                    100.0f * (uniformBufferOffsets_[swapImageIndex_] / (f32)uniformBufferSize_));
-        Log::debug("| % descriptor sets were used this frame",
-                   descriptorSetCaches_[swapImageIndex_].countNumUsed());
+        Log::debug("| %/% descriptor sets were used this frame",
+                   descriptorSetCaches_[swapImageIndex_].countNumUsed(), maxSets_);
         Log::debug("| % descriptor sets are cached for this frame",
                    descriptorSetCaches_[swapImageIndex_].countTotalCached());
         Log::debug("+-------------------------------");
@@ -705,7 +708,7 @@ VkBuffer RenderDevice::createVertexBuffer(const void *data, VkDeviceSize size) {
         Log::fatal("Invalid vertex buffer size: %", size);
     }
 
-    return createBuffer(data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    return createBufferGPU(data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 }
 
 VkBuffer RenderDevice::createIndexBuffer(const void *data, VkDeviceSize size) {
@@ -713,7 +716,137 @@ VkBuffer RenderDevice::createIndexBuffer(const void *data, VkDeviceSize size) {
         Log::fatal("Invalid index buffer size: %", size);
     }
 
-    return createBuffer(data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    return createBufferGPU(data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+}
+
+std::pair<VkImage, VkImageView> RenderDevice::createTextureGPUFromData(u32 width, u32 height, VkFormat format,
+                                                                       const void *data, VkDeviceSize size) {
+    // Create staging buffer
+    std::pair<VkBuffer, VmaAllocation> stagingBuffer = createStagingBufferCPU(data, size);
+
+    // Create image
+    VkImageCreateInfo imageCI = {};
+    imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageCI.imageType = VK_IMAGE_TYPE_2D;
+    imageCI.format = format;
+    imageCI.extent.width = width;
+    imageCI.extent.height = height;
+    imageCI.extent.depth = 1;
+    imageCI.mipLevels = 1;
+    imageCI.arrayLayers = 1;
+    imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo allocCI = {};
+    allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VkImage image;
+    VmaAllocation allocation;
+    VK_CHECKF(vmaCreateImage(allocator_, &imageCI, &allocCI, &image, &allocation, nullptr));
+    cleanupStack_.emplace([ = ]() {
+        vmaDestroyImage(allocator_, image, allocation);
+    });
+
+    // Copy data into image
+    submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
+        // Transition image for copying buffer into it
+        {
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.image = image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.layerCount = 1;
+
+            cmd.pipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                0, 0, nullptr, 0, nullptr, 1, &barrier);
+        }
+
+        // Copy buffer into it
+        {
+            cmd.copyBufferToImage(stagingBuffer.first, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                  VK_IMAGE_ASPECT_COLOR_BIT, width, height);
+        }
+
+        // Transition image for reading in shaders
+        {
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.image = image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.layerCount = 1;
+
+            cmd.pipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                0, 0, nullptr, 0, nullptr, 1, &barrier);
+        }
+    });
+
+    // Destroy staging buffer, we're done using it
+    vmaDestroyBuffer(allocator_, stagingBuffer.first, stagingBuffer.second);
+
+    // Create image view
+    VkImageViewCreateInfo imageViewCI = {};
+    imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    imageViewCI.image = image;
+    imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    imageViewCI.format = format;
+    imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageViewCI.subresourceRange.levelCount = 1;
+    imageViewCI.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    VK_CHECKF(vkCreateImageView(device_, &imageViewCI, nullptr, &imageView));
+    cleanupStack_.emplace([ = ]() {
+        vkDestroyImageView(device_, imageView, nullptr);
+    });
+
+    return { image, imageView };
+}
+
+// TODO: mipmapped textures
+
+VkSampler RenderDevice::createSampler(VkFilter mag_filter, VkFilter min_filter, VkSamplerAddressMode u_wrap,
+                                      VkSamplerAddressMode v_wrap, VkSamplerAddressMode w_wrap) {
+    // TODO: anisotropic filtering
+
+    VkSamplerCreateInfo samplerCI = {};
+    samplerCI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerCI.magFilter = mag_filter;
+    samplerCI.minFilter = min_filter;
+    samplerCI.addressModeU = u_wrap;
+    samplerCI.addressModeV = v_wrap;
+    samplerCI.addressModeW = w_wrap;
+    samplerCI.anisotropyEnable = VK_FALSE;
+    samplerCI.maxAnisotropy = 1.0f;
+    samplerCI.compareEnable = VK_FALSE;
+    samplerCI.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    samplerCI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerCI.mipLodBias = 0.0f;
+    samplerCI.minLod = 0.0f;
+    samplerCI.maxLod = 0.0f;
+    samplerCI.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerCI.unnormalizedCoordinates = VK_FALSE;
+
+    VkSampler sampler;
+    VK_CHECKF(vkCreateSampler(device_, &samplerCI, nullptr, &sampler));
+    cleanupStack_.emplace([ = ]() {
+        vkDestroySampler(device_, sampler, nullptr);
+    });
+
+    return sampler;
 }
 
 VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set) {
@@ -821,6 +954,28 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         write.descriptorCount = 1;
         write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         write.pBufferInfo = &bufferInfos.back();
+
+        writes.emplace_back(write);
+    }
+
+    //----------------------------------
+    // Combined image samplers
+    //----------------------------------
+
+    for (const CombinedImageSamplerDescriptorInfo &info : set.getCombinedImageSamplerInfos()) {
+        VkDescriptorImageInfo imageInfo = {};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = info.view;
+        imageInfo.sampler = info.sampler;
+        imageInfos.emplace_back(imageInfo);
+
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = dstSet;
+        write.dstBinding = info.binding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.pImageInfo = &imageInfos.back();;
 
         writes.emplace_back(write);
     }
@@ -1119,7 +1274,7 @@ void RenderDevice::createSwapchain() {
     }
 }
 
-VkBuffer RenderDevice::createBuffer(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage) {
+VkBuffer RenderDevice::createBufferGPU(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage) {
     // Create our buffer and memory
     VkBufferCreateInfo bufferCI = {};
     bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1144,39 +1299,44 @@ VkBuffer RenderDevice::createBuffer(const void *data, VkDeviceSize size, VkBuffe
         // If the memory happens to be mappable, no need for staging buffer
         void *mappedData;
         vmaMapMemory(allocator_, allocation, &mappedData);
-        memcpy(mappedData, data, (size_t) size);
+        std::memcpy(mappedData, data, (size_t) size);
         vmaUnmapMemory(allocator_, allocation);
     } else {
         // Otherwise, we need a staging buffer
-        VkBufferCreateInfo stagingBufferCI = {};
-        stagingBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        stagingBufferCI.size = size;
-        stagingBufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        stagingBufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        VmaAllocationCreateInfo stagingAllocCI = {};
-        stagingAllocCI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-        stagingAllocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-        VkBuffer stagingBuffer;
-        VmaAllocation stagingAllocation;
-        VmaAllocationInfo stagingAllocInfo;
-        VK_CHECKF(vmaCreateBuffer(allocator_, &stagingBufferCI, &stagingAllocCI, &stagingBuffer, &stagingAllocation,
-                                  &stagingAllocInfo));
-
-        // Copy data into staging buffer
-        memcpy(stagingAllocInfo.pMappedData, data, (size_t) size);
+        std::pair<VkBuffer, VmaAllocation> stagingBuffer = createStagingBufferCPU(data, size);
 
         // Copy staging buffer into vertex buffer
         submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
-            cmd.copyBuffer(buffer, stagingBuffer, size);
+            cmd.copyBuffer(buffer, stagingBuffer.first, size);
         });
 
         // Destroy staging buffer
-        vmaDestroyBuffer(allocator_, stagingBuffer, stagingAllocation);
+        vmaDestroyBuffer(allocator_, stagingBuffer.first, stagingBuffer.second);
     }
 
     return buffer;
+}
+
+std::pair<VkBuffer, VmaAllocation> RenderDevice::createStagingBufferCPU(const void *data, VkDeviceSize size) {
+    VkBufferCreateInfo stagingBufferCI = {};
+    stagingBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    stagingBufferCI.size = size;
+    stagingBufferCI.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    stagingBufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo stagingAllocCI = {};
+    stagingAllocCI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    stagingAllocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    VkBuffer stagingBuffer;
+    VmaAllocation stagingAllocation;
+    VmaAllocationInfo stagingAllocInfo;
+    VK_CHECKF(vmaCreateBuffer(allocator_, &stagingBufferCI, &stagingAllocCI, &stagingBuffer, &stagingAllocation,
+                              &stagingAllocInfo));
+
+    memcpy(stagingAllocInfo.pMappedData, data, static_cast<size_t>(size));
+
+    return { stagingBuffer, stagingAllocation };
 }
 
 }

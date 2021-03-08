@@ -39,6 +39,14 @@ public:
     void copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, VkDeviceSize dst_offset = 0,
                     VkDeviceSize src_offset = 0);
 
+    void copyBufferToImage(VkBuffer src, VkImage dst, VkImageLayout dst_layout, VkImageAspectFlags image_aspect,
+                           u32 width, u32 height, u32 depth = 1);
+
+    void pipelineBarrier(VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage, VkDependencyFlags dependency,
+                         u32 num_memory_barriers, const VkMemoryBarrier *memory_barriers,
+                         u32 num_buffer_memory_barriers, const VkBufferMemoryBarrier *buffer_memory_barriers,
+                         u32 num_image_memory_barriers, const VkImageMemoryBarrier *image_memory_barriers);
+
 private:
     VkCommandBuffer commandBuffer_;
 };

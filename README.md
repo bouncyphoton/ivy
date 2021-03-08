@@ -37,7 +37,7 @@ passes_.emplace_back(
         .addDepthAttachment("depth", 2)
         
         // Add a uniform buffer to our subpass (in set 0, binding 0)
-        .addUniformBuffer(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
+        .addUniformBufferDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
         .build()
     )
     
@@ -52,9 +52,9 @@ passes_.emplace_back(
         .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
         
         // Input attachments from previous subpass (in set 0 and bindings 0, 1, and 2 respectively)
-        .addInputAttachment(0, 0, "albedo")
-        .addInputAttachment(0, 1, "position")
-        .addInputAttachment(0, 2, "depth")
+        .addInputAttachmentDescriptor(0, 0, "albedo")
+        .addInputAttachmentDescriptor(0, 1, "position")
+        .addInputAttachmentDescriptor(0, 2, "depth")
         
         .build()
     )

@@ -1,8 +1,13 @@
 #include "resource_manager.h"
 #include "ivy/log.h"
+#include "ivy/graphics/vertex.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #include <filesystem>
 
 namespace ivy {
@@ -12,52 +17,73 @@ ResourceManager::ResourceManager(gfx::RenderDevice &render_device, const std::st
     if (!std::filesystem::is_directory(resourceDirectory_)) {
         Log::fatal("Invalid resource directory: '%'", resourceDirectory_);
     }
+
+    // Load default textures
+    {
+        u8 pixels[] = {255, 255, 255, 255};
+        loadTexture("*white", 1, 1, VK_FORMAT_R8G8B8A8_UNORM, pixels, sizeof(pixels));
+    }
 }
 
 ModelResource ResourceManager::getModel(const std::string &model_name) {
-    auto it = modelDatas_.find(model_name);
-    if (it == modelDatas_.end()) {
+    auto it = modelMeshes_.find(model_name);
+    if (it == modelMeshes_.end()) {
         if (!loadModelFromFile(model_name)) {
             Log::fatal("Failed to get model '%'", model_name);
         }
 
-        it = modelDatas_.find(model_name);
+        it = modelMeshes_.find(model_name);
     }
 
     return ModelResource(*it->second);
 }
 
-bool ResourceManager::loadModelFromFile(const std::string &resource_path) {
-    std::filesystem::path filePath = std::filesystem::path(resourceDirectory_ + resource_path).lexically_normal();
+TextureResource ResourceManager::getTexture(const std::string &texture_name) {
+    auto it = textures_.find(texture_name);
+    if (it == textures_.end()) {
+        if (!loadTextureFromFile(texture_name)) {
+            Log::fatal("Failed to get texture '%'", texture_name);
+        }
+
+        it = textures_.find(texture_name);
+    }
+
+    return TextureResource(*it->second);
+}
+
+bool ResourceManager::loadModelFromFile(const std::string &model_path) {
+    std::filesystem::path filePath = std::filesystem::path(resourceDirectory_ + model_path).lexically_normal();
 
     if (!std::filesystem::is_regular_file(filePath)) {
         Log::warn("Invalid resource location: '%'", filePath);
         return false;
     }
 
-    if (modelDatas_.find(resource_path) != modelDatas_.end()) {
-        Log::warn("Tried to load already loaded resource: '%'",  resource_path);
+    if (modelMeshes_.find(model_path) != modelMeshes_.end()) {
+        Log::warn("Tried to load already loaded resource: '%'", model_path);
         return false;
     }
 
-    std::vector<gfx::Geometry> geometries;
+    std::vector<gfx::Mesh> meshes;
 
     Assimp::Importer importer;
-    const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(), aiProcess_Triangulate | aiProcess_GenNormals);
+    const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(),
+                                             aiProcess_Triangulate | aiProcess_GenUVCoords |
+                                             aiProcess_GenNormals);
     if (!scene) {
         Log::warn("Failed to read resource '%': %", filePath, importer.GetErrorString());
         return false;
     }
 
     for (u32 m = 0; m < scene->mNumMeshes; ++m) {
-        std::vector<gfx::VertexP3C3> vertices;
+        std::vector<gfx::VertexP3N3UV2> vertices;
         std::vector<u32> indices;
 
         aiMesh *mesh = scene->mMeshes[m];
 
         vertices.reserve(mesh->mNumVertices);
         for (u32 v = 0; v < mesh->mNumVertices; ++v) {
-            vertices.emplace_back(gfx::VertexP3C3(
+            vertices.emplace_back(gfx::VertexP3N3UV2(
                                       glm::vec3(
                                           mesh->mVertices[v].x,
                                           mesh->mVertices[v].y,
@@ -67,7 +93,10 @@ bool ResourceManager::loadModelFromFile(const std::string &resource_path) {
                                           mesh->mNormals[v].y,
                                           mesh->mNormals[v].z
                                       ),
-                                      glm::vec3(1)
+                                      glm::vec2(
+                                          mesh->mTextureCoords[0][v].x,
+                                          mesh->mTextureCoords[0][v].y
+                                      )
                                   ));
         }
 
@@ -79,17 +108,49 @@ bool ResourceManager::loadModelFromFile(const std::string &resource_path) {
             }
         }
 
-        // TODO: material
+        // TODO: more graceful material getting
+        aiMaterial *aiMat = scene->mMaterials[mesh->mMaterialIndex];
+        std::string albedoTextureName = "*white";
 
-        geometries.emplace_back(device_, vertices, indices);
+        if (aiMat->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
+            aiString diffusePath;
+            aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &diffusePath);
+            albedoTextureName = filePath.parent_path().string() + "/" + diffusePath.C_Str();
+        }
+
+        gfx::Material material(getTexture(albedoTextureName).get());
+
+        meshes.emplace_back(gfx::Geometry(device_, vertices, indices), material);
     }
 
-    loadModel(resource_path, geometries);
+    loadModel(model_path, meshes);
     return true;
 }
 
-void ResourceManager::loadModel(const std::string &name, const std::vector<gfx::Geometry> &meshes) {
-    modelDatas_.emplace(name, std::make_unique<std::vector<gfx::Geometry>>(meshes));
+void ResourceManager::loadModel(const std::string &name, const std::vector<gfx::Mesh> &meshes) {
+    modelMeshes_.emplace(name, std::make_unique<std::vector<gfx::Mesh>>(meshes));
+}
+
+bool ResourceManager::loadTextureFromFile(const std::string &texture_path) {
+    std::filesystem::path filePath = std::filesystem::path(resourceDirectory_ + texture_path).lexically_normal();
+
+    // Read image
+    i32 width, height;
+    u8 *data = stbi_load(filePath.c_str(), &width, &height, nullptr, 4);
+    if (!data) {
+        return false;
+    }
+    u32 size = width * height * 4;
+
+    loadTexture(texture_path, width, height, VK_FORMAT_R8G8B8A8_UNORM, data, size);
+
+    // Free image data
+    stbi_image_free(data);
+    return true;
+}
+
+void ResourceManager::loadTexture(const std::string &name, u32 width, u32 height, VkFormat format, u8 *data, u32 size) {
+    textures_.emplace(name, std::make_unique<gfx::Texture2D>(device_, width, height, format, data, size));
 }
 
 }

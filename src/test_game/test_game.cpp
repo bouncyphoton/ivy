@@ -34,17 +34,17 @@ void TestGame::init() {
         entities_.emplace_back();
         entities_.back().setTag("bunny");
         entities_.back().setComponent<Transform>();
-        entities_.back().setComponent<Model>(resourceManager.getModel("models/bunny.obj"));
+        entities_.back().setComponent(Model(resourceManager.getModel("models/bunny.obj")));
     }
 
     // Add sponza
     entities_.emplace_back();
     entities_.back().setComponent<Transform>();
-    entities_.back().setComponent<Model>(resourceManager.getModel("models/sponza/sponza.obj"));
+    entities_.back().setComponent(Model(resourceManager.getModel("models/sponza/sponza.obj")));
 
     // Add camera
     entities_.emplace_back();
-    entities_.back().setComponent<Transform>(Transform(glm::vec3(0, 1, 5)));
+    entities_.back().setComponent(Transform(glm::vec3(0, 1, 5)));
     entities_.back().setComponent<Camera>();
 }
 

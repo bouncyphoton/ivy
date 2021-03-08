@@ -3,7 +3,6 @@
 
 #include "ivy/entity/components/component.h"
 #include "ivy/resources/model_resource.h"
-#include "ivy/graphics/command_buffer.h"
 
 namespace ivy {
 
@@ -12,15 +11,15 @@ namespace ivy {
  */
 class Model : public Component {
 public:
-    Model(const ModelResource &mesh_resource)
-        : meshResource_(mesh_resource) {}
+    explicit Model(const ModelResource &mesh_resource)
+        : modelResource_(mesh_resource) {}
 
-    void draw(gfx::CommandBuffer &cmd) {
-        meshResource_.draw(cmd);
+    [[nodiscard]] const std::vector<gfx::Mesh> &getMeshes() const {
+        return modelResource_.get();
     }
 
 private:
-    ModelResource meshResource_;
+    ModelResource modelResource_;
     // TODO: shadow options, lighting options, etc.
 };
 

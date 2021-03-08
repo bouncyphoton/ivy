@@ -376,14 +376,19 @@ SubpassBuilder &SubpassBuilder::addVertexDescription(const std::vector<VkVertexI
     return *this;
 }
 
-SubpassBuilder &SubpassBuilder::addInputAttachment(u32 set, u32 binding, const std::string &attachment_name) {
+SubpassBuilder &SubpassBuilder::addInputAttachmentDescriptor(u32 set, u32 binding, const std::string &attachment_name) {
     subpass_.inputAttachmentNames_.emplace_back(attachment_name);
     addDescriptor(set, binding, VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
     return *this;
 }
 
-SubpassBuilder &SubpassBuilder::addUniformBuffer(u32 set, u32 binding, VkShaderStageFlags stage_flags) {
+SubpassBuilder &SubpassBuilder::addUniformBufferDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags) {
     addDescriptor(set, binding, stage_flags, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::addTextureDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags) {
+    addDescriptor(set, binding, stage_flags, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     return *this;
 }
 

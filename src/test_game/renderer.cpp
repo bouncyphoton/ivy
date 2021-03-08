@@ -1,12 +1,12 @@
 #include "renderer.h"
 #include "ivy/log.h"
 #include "ivy/graphics/vertex.h"
+#include "ivy/graphics/texture2d.h"
 #include "ivy/entity/components/transform.h"
 #include "ivy/entity/components/model.h"
 #include "ivy/entity/components/camera.h"
 #include <glm/gtc/matrix_transform.hpp>
 
-// TODO: textures
 // TODO: multiple render passes
 // TODO: compute pass
 
@@ -48,11 +48,13 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     gfx::SubpassBuilder()
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/gbuffer.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/gbuffer.frag.spv")
-                    .addVertexDescription(gfx::VertexP3C3::getBindingDescriptions(), gfx::VertexP3C3::getAttributeDescriptions())
+                    .addVertexDescription(gfx::VertexP3N3UV2::getBindingDescriptions(),
+                                          gfx::VertexP3N3UV2::getAttributeDescriptions())
                     .addColorAttachment("albedo", 0)
                     .addColorAttachment("normal", 1)
                     .addDepthAttachment("depth")
-                    .addUniformBuffer(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
+                    .addUniformBufferDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
+                    .addTextureDescriptor(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build()
                    )
         .addSubpass("lighting_pass",
@@ -60,10 +62,10 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/lighting.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/lighting.frag.spv")
                     .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
-                    .addInputAttachment(0, 0, "albedo")
-                    .addInputAttachment(0, 1, "normal")
-                    .addInputAttachment(0, 2, "depth")
-                    .addUniformBuffer(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .addInputAttachmentDescriptor(0, 0, "albedo")
+                    .addInputAttachmentDescriptor(0, 1, "normal")
+                    .addInputAttachmentDescriptor(0, 2, "depth")
+                    .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build()
                    )
         .addSubpassDependency(gfx::GraphicsPass::SwapchainName, "gbuffer_pass",
@@ -132,13 +134,22 @@ void Renderer::render(const std::vector<Entity> &entities) {
                     mvpData.model = transform->getModelMatrix();
                     mvpData.normal = glm::inverse(glm::transpose(mvpData.model));
 
-                    // Put MVP data in a descriptor set and bind it
-                    gfx::DescriptorSet mvpSet(pass, subpassIdx, 0);
-                    mvpSet.setUniformBuffer(0, mvpData);
-                    cmd.setDescriptorSet(device_, pass, mvpSet);
+                    // Iterate over meshes in model
+                    for (const gfx::Mesh &mesh : model->getMeshes()) {
+                        // Put MVP data in a descriptor set and bind it
+                        gfx::DescriptorSet mvpSet(pass, subpassIdx, 0);
+                        mvpSet.setUniformBuffer(0, mvpData);
+                        cmd.setDescriptorSet(device_, pass, mvpSet);
 
-                    // Draw our model
-                    model->draw(cmd);
+                        // Material data
+                        const gfx::Material &mat = mesh.getMaterial();
+                        gfx::DescriptorSet materialSet(pass, subpassIdx, 1);
+                        materialSet.setTexture(0, mat.getAlbedoTexture());
+                        cmd.setDescriptorSet(device_, pass, materialSet);
+
+                        // Draw this mesh
+                        mesh.getGeometry().draw(cmd);
+                    }
                 }
             }
         }
