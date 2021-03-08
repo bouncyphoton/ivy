@@ -5,14 +5,14 @@ layout (location = 0) in VertexData {
     vec2 uv;
 } FS_IN;
 
-layout (location = 0) out vec4 oAlbedo;
+layout (location = 0) out vec4 oDiffuse;
 layout (location = 1) out vec4 oNormal;
 
-layout (set = 1, binding = 0) uniform sampler2D uAlbedoTexture;
+layout (set = 1, binding = 0) uniform sampler2D uDiffuseTexture;
 
 void main() {
-    oAlbedo = texture(uAlbedoTexture, FS_IN.uv);
-    if (oAlbedo.a == 0) {
+    oDiffuse = texture(uDiffuseTexture, FS_IN.uv);
+    if (oDiffuse.a == 0) {
         discard;
     }
 

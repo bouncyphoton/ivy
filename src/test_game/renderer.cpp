@@ -41,7 +41,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
     passes_.emplace_back(
         gfx::GraphicsPassBuilder(device_)
         .addAttachmentSwapchain()
-        .addAttachment("albedo", VK_FORMAT_R8G8B8A8_UNORM)
+        .addAttachment("diffuse", VK_FORMAT_R8G8B8A8_UNORM)
         .addAttachment("normal", VK_FORMAT_R16G16B16A16_SFLOAT)
         .addAttachment("depth", depthFormat)
         .addSubpass("gbuffer_pass",
@@ -50,7 +50,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/gbuffer.frag.spv")
                     .addVertexDescription(gfx::VertexP3N3UV2::getBindingDescriptions(),
                                           gfx::VertexP3N3UV2::getAttributeDescriptions())
-                    .addColorAttachment("albedo", 0)
+                    .addColorAttachment("diffuse", 0)
                     .addColorAttachment("normal", 1)
                     .addDepthAttachment("depth")
                     .addUniformBufferDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
@@ -62,7 +62,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/lighting.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/lighting.frag.spv")
                     .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
-                    .addInputAttachmentDescriptor(0, 0, "albedo")
+                    .addInputAttachmentDescriptor(0, 0, "diffuse")
                     .addInputAttachmentDescriptor(0, 1, "normal")
                     .addInputAttachmentDescriptor(0, 2, "depth")
                     .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -144,7 +144,7 @@ void Renderer::render(const std::vector<Entity> &entities) {
                         // Material data
                         const gfx::Material &mat = mesh.getMaterial();
                         gfx::DescriptorSet materialSet(pass, subpassIdx, 1);
-                        materialSet.setTexture(0, mat.getAlbedoTexture());
+                        materialSet.setTexture(0, mat.getDiffuseTexture());
                         cmd.setDescriptorSet(device_, pass, materialSet);
 
                         // Draw this mesh
@@ -165,7 +165,7 @@ void Renderer::render(const std::vector<Entity> &entities) {
             // Set our input attachments in descriptor set and bind it
             {
                 gfx::DescriptorSet inputAttachmentsSet(pass, subpassIdx, 0);
-                inputAttachmentsSet.setInputAttachment(0, "albedo");
+                inputAttachmentsSet.setInputAttachment(0, "diffuse");
                 inputAttachmentsSet.setInputAttachment(1, "normal");
                 inputAttachmentsSet.setInputAttachment(2, "depth");
                 cmd.setDescriptorSet(device_, pass, inputAttachmentsSet);

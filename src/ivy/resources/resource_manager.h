@@ -37,6 +37,12 @@ private:
 
     std::unordered_map<std::string, std::unique_ptr<std::vector<gfx::Mesh>>> modelMeshes_;
     std::unordered_map<std::string, std::unique_ptr<gfx::Texture2D>> textures_;
+
+    gfx::Texture2D *textureWhite_;
+    gfx::Texture2D *textureBlackOpaque_;
+    gfx::Texture2D *textureBlackTransparent_;
+    gfx::Texture2D *textureNormal_;
+    gfx::Texture2D *textureMissing_;
 };
 
 }

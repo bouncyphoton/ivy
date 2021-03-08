@@ -22,6 +22,31 @@ ResourceManager::ResourceManager(gfx::RenderDevice &render_device, const std::st
     {
         u8 pixels[] = {255, 255, 255, 255};
         loadTexture("*white", 1, 1, VK_FORMAT_R8G8B8A8_UNORM, pixels, sizeof(pixels));
+        textureWhite_ = textures_.find("*white")->second.get();
+    }
+    {
+        u8 pixels[] = {0, 0, 0, 255};
+        loadTexture("*blackOpaque", 1, 1, VK_FORMAT_R8G8B8A8_UNORM, pixels, sizeof(pixels));
+        textureBlackOpaque_ = textures_.find("*blackOpaque")->second.get();
+    }
+    {
+        u8 pixels[] = {0, 0, 0, 0};
+        loadTexture("*blackTransparent", 1, 1, VK_FORMAT_R8G8B8A8_UNORM, pixels, sizeof(pixels));
+        textureBlackTransparent_ = textures_.find("*blackTransparent")->second.get();
+    }
+    {
+        u8 pixels[] = {127, 127, 255, 255};
+        loadTexture("*normal", 1, 1, VK_FORMAT_R8G8B8A8_UNORM, pixels, sizeof(pixels));
+        textureNormal_ = textures_.find("*normal")->second.get();
+    }
+    {
+        u8 pixels[] = {255, 0, 255, 255,
+                       0, 0, 0, 255,
+                       0, 0, 0, 255,
+                       255, 0, 255, 255
+                      };
+        loadTexture("*missing", 2, 2, VK_FORMAT_R8G8B8A8_UNORM, pixels, sizeof(pixels));
+        textureMissing_ = textures_.find("*missing")->second.get();
     }
 }
 
@@ -42,7 +67,8 @@ TextureResource ResourceManager::getTexture(const std::string &texture_name) {
     auto it = textures_.find(texture_name);
     if (it == textures_.end()) {
         if (!loadTextureFromFile(texture_name)) {
-            Log::fatal("Failed to get texture '%'", texture_name);
+            Log::warn("Failed to get texture '%'", texture_name);
+            return TextureResource(*textureMissing_);
         }
 
         it = textures_.find(texture_name);
@@ -53,6 +79,7 @@ TextureResource ResourceManager::getTexture(const std::string &texture_name) {
 
 bool ResourceManager::loadModelFromFile(const std::string &model_path) {
     std::filesystem::path filePath = std::filesystem::path(resourceDirectory_ + model_path).lexically_normal();
+    std::string relativeDirectory = std::filesystem::path(model_path).parent_path().string() + "/";
 
     if (!std::filesystem::is_regular_file(filePath)) {
         Log::warn("Invalid resource location: '%'", filePath);
@@ -75,12 +102,14 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         return false;
     }
 
+    // Process meshes
     for (u32 m = 0; m < scene->mNumMeshes; ++m) {
         std::vector<gfx::VertexP3N3UV2> vertices;
         std::vector<u32> indices;
 
         aiMesh *mesh = scene->mMeshes[m];
 
+        // Process vertices
         vertices.reserve(mesh->mNumVertices);
         for (u32 v = 0; v < mesh->mNumVertices; ++v) {
             vertices.emplace_back(gfx::VertexP3N3UV2(
@@ -100,6 +129,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
                                   ));
         }
 
+        // Process indices
         indices.reserve(mesh->mNumFaces * 3);
         for (u32 f = 0; f < mesh->mNumFaces; ++f) {
             aiFace face = mesh->mFaces[f];
@@ -108,19 +138,22 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
             }
         }
 
-        // TODO: more graceful material getting
+        // Get material for this mesh
         aiMaterial *aiMat = scene->mMaterials[mesh->mMaterialIndex];
-        std::string albedoTextureName = "*white";
 
+        // Diffuse
+        const gfx::Texture2D *diffuseTexture = textureWhite_;
         if (aiMat->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
             aiString diffusePath;
             aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &diffusePath);
-            albedoTextureName = filePath.parent_path().string() + "/" + diffusePath.C_Str();
+            diffuseTexture = &getTexture(relativeDirectory + diffusePath.C_Str()).get();
         }
 
-        gfx::Material material(getTexture(albedoTextureName).get());
-
-        meshes.emplace_back(gfx::Geometry(device_, vertices, indices), material);
+        // Save mesh
+        meshes.emplace_back(
+            gfx::Geometry(device_, vertices, indices),
+            gfx::Material(*diffuseTexture)
+        );
     }
 
     loadModel(model_path, meshes);

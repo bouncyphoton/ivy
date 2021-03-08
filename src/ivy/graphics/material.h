@@ -10,15 +10,15 @@ class Texture2D;
  */
 class Material {
 public:
-    explicit Material(const Texture2D &albedo_texture)
-        : albedoTexture_(albedo_texture) {}
+    explicit Material(const Texture2D &diffuse_texture)
+        : diffuseTexture_(diffuse_texture) {}
 
-    [[nodiscard]] const Texture2D &getAlbedoTexture() const {
-        return albedoTexture_;
+    [[nodiscard]] const Texture2D &getDiffuseTexture() const {
+        return diffuseTexture_;
     }
 
 private:
-    const Texture2D &albedoTexture_;
+    const Texture2D &diffuseTexture_;
 };
 
 }

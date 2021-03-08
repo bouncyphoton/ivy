@@ -1,7 +1,7 @@
 #version 450
 #include "utils.glsl"
 
-layout (input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput iAlbedo;
+layout (input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput iDiffuse;
 layout (input_attachment_index = 1, set = 0, binding = 1) uniform subpassInput iNormal;
 layout (input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput iDepth;
 
@@ -19,7 +19,7 @@ void main() {
     if (depth == 1) {
         discard;
     }
-    vec3 albedo = subpassLoad(iAlbedo).rgb;
+    vec3 diffuse = subpassLoad(iDiffuse).rgb;
     vec3 normal = normalize(subpassLoad(iNormal).xyz);
 
     // Derived variables
@@ -33,6 +33,6 @@ void main() {
     vec3 sunDir = normalize(vec3(1));
 
     // Shade
-    vec3 color = max(ambient, dot(normal, sunDir)) * albedo;
+    vec3 color = max(ambient, dot(normal, sunDir)) * diffuse;
     oFragColor = vec4(color, 1);
 }
