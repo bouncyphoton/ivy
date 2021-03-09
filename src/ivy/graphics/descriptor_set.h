@@ -91,6 +91,14 @@ public:
     void setTexture(u32 binding, const Texture2D &texture);
 
     /**
+     * \brief Set a 2D texture in the descriptor set manually
+     * \param binding The binding in the set for the texture
+     * \param view The image view for the texture
+     * \param sampler The sampler for the texture
+     */
+    void setTexture(u32 binding, VkImageView view, VkSampler sampler);
+
+    /**
      * \brief Validate that everything was set properly
      */
     void validate() const;

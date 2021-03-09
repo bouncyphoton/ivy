@@ -5,6 +5,7 @@
 #include "ivy/entity/components/transform.h"
 #include "ivy/entity/components/model.h"
 #include "ivy/entity/components/camera.h"
+#include "ivy/entity/components/light.h"
 #include "ivy/resources/resource_manager.h"
 #include "ivy/platform/input_state.h"
 #include <GLFW/glfw3.h>
@@ -51,6 +52,10 @@ void TestGame::init() {
     entities_.emplace_back();
     entities_.back().setComponent(Transform(glm::vec3(0, 1, 5)));
     entities_.back().setComponent<Camera>();
+
+    // Add directional light
+    entities_.emplace_back();
+    entities_.back().setComponent(DirectionalLight(glm::vec3(-0.1f, -1.0f, -0.1f)));
 }
 
 void TestGame::update() {
@@ -77,8 +82,8 @@ void TestGame::update() {
         debugMode_ = Renderer::DebugMode::WORLD;
         Log::debug("Rendering derived world position");
     }  else if (input.isKeyPressed(GLFW_KEY_5)) {
-        debugMode_ = Renderer::DebugMode::DEPTH;
-        Log::debug("Rendering depth");
+        debugMode_ = Renderer::DebugMode::SHADOW_MAP;
+        Log::debug("Rendering shadow map");
     }
 
     // Update entities

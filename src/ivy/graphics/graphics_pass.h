@@ -95,9 +95,9 @@ public:
 
     explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
                           const std::map<std::string, AttachmentInfo> &attachment_infos,
-                          const std::map<u32, std::map<u32, DescriptorSetLayout>> &descriptorSetLayouts)
-        : renderPass_(render_pass), subpasses_(subpasses),
-          attachmentInfos_(attachment_infos), descriptorSetLayouts_(descriptorSetLayouts) {}
+                          const std::map<u32, std::map<u32, DescriptorSetLayout>> &descriptorSetLayouts, VkExtent2D extent)
+        : renderPass_(render_pass), subpasses_(subpasses), attachmentInfos_(attachment_infos),
+          descriptorSetLayouts_(descriptorSetLayouts), passExtent_(extent) {}
 
     /**
      * \brief Get the VkRenderPass for this graphics pass
@@ -134,6 +134,14 @@ public:
         return descriptorSetLayouts_.at(subpass_index).at(set_index);
     }
 
+    /**
+     * \brief Get the width and height of the graphics pass
+     * \return VkExtent2D
+     */
+    [[nodiscard]] VkExtent2D getExtent() const {
+        return passExtent_;
+    }
+
 private:
     // Friend so that they can access UnusedName
     friend class GraphicsPassBuilder;
@@ -148,6 +156,7 @@ private:
     std::vector<Subpass> subpasses_;
     std::map<std::string, AttachmentInfo> attachmentInfos_;
     std::map<u32, std::map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
+    VkExtent2D passExtent_;
 };
 
 /**
@@ -233,8 +242,6 @@ public:
      */
     SubpassBuilder &addDepthAttachment(const std::string &attachment_name);
 
-    // TODO: make this private, only allow adding of descriptors via functions like addInputAttachment
-
     /**
      * \brief Build the subpass
      * \return SubpassInfo
@@ -260,16 +267,17 @@ private:
  */
 class GraphicsPassBuilder {
 public:
-    explicit GraphicsPassBuilder(RenderDevice &device)
-        : device_(device) {}
+    explicit GraphicsPassBuilder(RenderDevice &device);
 
     /**
      * \brief Add an attachment to the graphics pass. Load and store ops as well as final layout are deduced from format
      * \param attachment_name The name of the attachment
      * \param format The format of the attachment
+     * \param additional_usage Additional usage flags to be OR'd with deduced usage flags
      * \return GraphicsPassBuilder
      */
-    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format);
+    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format,
+                                       VkImageUsageFlags additional_usage = 0);
 
     /**
      * \brief Add an attachment to the graphics pass
@@ -281,12 +289,14 @@ public:
      * \param stencil_store_op The stencil store op for the attachment
      * \param initial_layout The initial layout for the attachment
      * \param final_layout The final layout for the attachment
+     * \param usage The usage flags for this attachment
      * \return GraphicsPassBuilder
      */
     GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format,
                                        VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
                                        VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op,
-                                       VkImageLayout initial_layout, VkImageLayout final_layout);
+                                       VkImageLayout initial_layout, VkImageLayout final_layout,
+                                       VkImageUsageFlags usage);
 
     /**
      * \brief Add an attachment to reference the swapchain
@@ -316,6 +326,12 @@ public:
                                               VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
                                               VkAccessFlags src_access_flags, VkAccessFlags dst_access_flags);
 
+    /**
+     * \brief Set the extent of the attachments in this graphics pass (if not set, this defaults to swapchain extent)
+     * \return GraphicsPassBuilder
+     */
+    GraphicsPassBuilder &setExtent(u32 width, u32 height);
+
     GraphicsPass build();
 private:
     struct DependencyInfo {
@@ -332,6 +348,7 @@ private:
     std::unordered_map<std::string, SubpassInfo> subpassInfos_;
     std::vector<std::string> subpassOrder_;
     std::vector<DependencyInfo> subpassDependencyInfo_;
+    VkExtent2D extent_;
 };
 
 }

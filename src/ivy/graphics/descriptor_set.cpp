@@ -27,7 +27,11 @@ void DescriptorSet::setUniformBuffer(u32 binding, const void *data, size_t size)
 }
 
 void DescriptorSet::setTexture(u32 binding, const Texture2D &texture) {
-    combinedImageSamplerInfos_.emplace_back(binding, texture.getImageView(), texture.getSampler());
+    setTexture(binding, texture.getImageView(), texture.getSampler());
+}
+
+void DescriptorSet::setTexture(u32 binding, VkImageView view, VkSampler sampler) {
+    combinedImageSamplerInfos_.emplace_back(binding, view, sampler);
 }
 
 void DescriptorSet::validate() const {

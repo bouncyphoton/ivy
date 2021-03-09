@@ -49,6 +49,12 @@ public:
     CommandBuffer getCommandBuffer();
 
     /**
+     * \brief Get graphics queue
+     * \return VkQueue
+     */
+    VkQueue getGraphicsQueue();
+
+    /**
      * \brief Get and submit a command buffer for recording one time commands (like a buffer copy)
      * \param queue The queue the command buffer should be submitted to
      * \param record_func A function that records commands into a command buffer

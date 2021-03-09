@@ -91,7 +91,7 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
 
     std::set<u32> uniqueIndices = { graphicsFamilyIndex_, computeFamilyIndex_, presentFamilyIndex_ };
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    float queuePriority = 1;
+    f32 queuePriority = 1;
 
     for (auto &index : uniqueIndices) {
         VkDeviceQueueCreateInfo queueCreateInfo = {};
@@ -367,6 +367,10 @@ CommandBuffer RenderDevice::getCommandBuffer() {
     return CommandBuffer(commandBuffers_[swapImageIndex_]);
 }
 
+VkQueue RenderDevice::getGraphicsQueue() {
+    return graphicsQueue_;
+}
+
 void RenderDevice::submitOneTimeCommands(VkQueue queue, const std::function<void(CommandBuffer)> &record_func) {
     // TODO: create command pool for short-lived command buffers
 
@@ -556,7 +560,7 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     colorBlendCreateInfo.pAttachments = colorBlendAttachmentStates.data();
 
     // Dynamic state
-    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT };
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
     VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
     dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -605,30 +609,31 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
         const std::map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
 
         // Per in-flight frame
-        for (VkImageView &swapchainImageView : swapchainImageViews_) {
-            // These two hold almost the same data.
+        for (u32 frame = 0; frame < swapchainImages_.size(); ++frame) {
+            // Unordered map and vector hold almost the same data.
             // unordered_map is for keeping track of views by attachment name
             // vector is for framebuffer create info
             std::unordered_map<std::string, VkImageView> attachmentViews;
+            std::unordered_map<std::string, VkImage> attachmentImages;
             std::vector<VkImageView> viewsVector;
 
             // Get/create image view for each attachment in graphics pass
             for (const auto &infoPair : attachmentInfos) {
                 if (infoPair.first == GraphicsPass::SwapchainName) {
-                    attachmentViews[infoPair.first] = swapchainImageView;
-                    viewsVector.emplace_back(swapchainImageView);
+                    attachmentViews[infoPair.first] = swapchainImageViews_[frame];
+                    attachmentImages[infoPair.first] = swapchainImages_[frame];
+                    viewsVector.emplace_back(swapchainImageViews_[frame]);
                 } else {
                     const AttachmentInfo &desc = infoPair.second;
 
                     // TODO: support non-2D attachments (imageCI.imageType, imageCI.extent, imageViewCI.viewType) ?
-                    // TODO: support non-swapchain-sized attachments ?
 
                     VkImageCreateInfo imageCI = {};
                     imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
                     imageCI.imageType = VK_IMAGE_TYPE_2D;
                     imageCI.format = desc.description.format;
-                    imageCI.extent.width = swapchainExtent_.width;
-                    imageCI.extent.height = swapchainExtent_.height;
+                    imageCI.extent.width = pass.getExtent().width;
+                    imageCI.extent.height = pass.getExtent().height;
                     imageCI.extent.depth = 1;
                     imageCI.mipLevels = 1;
                     imageCI.arrayLayers = 1;
@@ -674,6 +679,7 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                     });
 
                     attachmentViews[infoPair.first] = view;
+                    attachmentImages[infoPair.first] = image;
                     viewsVector.emplace_back(view);
                 }
             }
@@ -684,8 +690,8 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
             framebufferCreateInfo.renderPass = renderPass;
             framebufferCreateInfo.attachmentCount = (u32) viewsVector.size();
             framebufferCreateInfo.pAttachments = viewsVector.data();
-            framebufferCreateInfo.width = swapchainExtent_.width;
-            framebufferCreateInfo.height = swapchainExtent_.height;
+            framebufferCreateInfo.width = pass.getExtent().width;
+            framebufferCreateInfo.height = pass.getExtent().height;
             framebufferCreateInfo.layers = 1;
 
             VkFramebuffer framebuffer;
@@ -694,7 +700,8 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                 vkDestroyFramebuffer(device_, framebuffer, nullptr);
             });
 
-            framebuffers_[renderPass].emplace_back(Framebuffer(framebuffer, swapchainExtent_, attachmentViews));
+            framebuffers_[renderPass].emplace_back(Framebuffer(framebuffer, swapchainExtent_,
+                                                               attachmentViews, attachmentImages));
         }
     }
 
@@ -891,7 +898,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     for (const InputAttachmentDescriptorInfo &desc : set.getInputAttachmentInfos()) {
         VkDescriptorImageInfo imageInfo = {};
         imageInfo.sampler = VK_NULL_HANDLE;
-        imageInfo.imageView = framebuffer.getViews().at(desc.attachmentName);
+        imageInfo.imageView = framebuffer.getView(desc.attachmentName);
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfos.emplace_back(imageInfo);
 

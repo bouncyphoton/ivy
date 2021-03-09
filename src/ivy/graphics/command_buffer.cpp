@@ -21,7 +21,7 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     renderPassBeginInfo.renderPass = pass.getVkRenderPass();
     renderPassBeginInfo.framebuffer = framebuffer.getVkFramebuffer();
     renderPassBeginInfo.renderArea.offset = {0, 0};
-    renderPassBeginInfo.renderArea.extent = framebuffer.getExtent();
+    renderPassBeginInfo.renderArea.extent = pass.getExtent();
 
     // Generate clear values for each attachment
     std::vector<VkClearValue> clearValues;
@@ -51,9 +51,14 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = renderPassBeginInfo.renderArea.extent;
+
     // Start render pass, call user functions, end render pass
     vkCmdBeginRenderPass(commandBuffer_, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdSetViewport(commandBuffer_, 0, 1, &viewport);
+    vkCmdSetScissor(commandBuffer_, 0, 1, &scissor);
     func();
     vkCmdEndRenderPass(commandBuffer_);
 }

@@ -9,6 +9,9 @@ namespace ivy::gfx {
 
 // TODO: would be cool to check shader bytecode to see if everything was referenced correctly
 
+GraphicsPassBuilder::GraphicsPassBuilder(RenderDevice &device)
+    : device_(device), extent_(device.getSwapchainExtent()) {}
+
 GraphicsPass GraphicsPassBuilder::build() {
     Log::debug("Building graphics pass");
 
@@ -87,9 +90,6 @@ GraphicsPass GraphicsPassBuilder::build() {
             reference.attachment = attachmentLocations[colorAttachmentName];
             reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-            // Set the usage for this attachment
-            attachments_[colorAttachmentName].usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
             // Add it to the list of color attachments for this subpass
             colorAttachmentReferences[subpassName].emplace_back(reference);
         }
@@ -111,9 +111,6 @@ GraphicsPass GraphicsPassBuilder::build() {
             VkAttachmentReference reference = {};
             reference.attachment = attachmentLocations[depthAttachmentName];
             reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-            // Set the usage for this attachment
-            attachments_[depthAttachmentName].usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
             // Add it to the list of depth attachments for this subpass
             depthAttachmentReferences[subpassName] = reference;
@@ -272,10 +269,11 @@ GraphicsPass GraphicsPassBuilder::build() {
     }
 
     // Create the graphics pass
-    return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts);
+    return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts, extent_);
 }
 
-GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format) {
+GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,
+                                                        VkImageUsageFlags additional_usage) {
     bool separateDepthStencilLayoutsEnabled = false;
     bool isDepth = format >= VK_FORMAT_D16_UNORM && format <= VK_FORMAT_D32_SFLOAT_S8_UINT && format != VK_FORMAT_S8_UINT;
     bool isStencil = format >= VK_FORMAT_S8_UINT && format <= VK_FORMAT_D32_SFLOAT_S8_UINT;
@@ -286,24 +284,30 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attac
     VkAttachmentStoreOp stencil_store_op = isStencil ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageLayout final_layout;
+    VkImageUsageFlags usage = 0;
     if ((isDepth && isStencil) || (isDepth && !separateDepthStencilLayoutsEnabled)) {
         final_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     } else if (isDepth && separateDepthStencilLayoutsEnabled) {
         final_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     } else if (isStencil) {
         final_layout = VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL;
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     } else {
         final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     }
 
     return addAttachment(attachment_name, format, load_op, store_op, stencil_load_op, stencil_store_op,
-                         initial_layout, final_layout);
+                         initial_layout, final_layout, usage | additional_usage);
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,
                                                         VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
                                                         VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op,
-                                                        VkImageLayout initial_layout, VkImageLayout final_layout) {
+                                                        VkImageLayout initial_layout, VkImageLayout final_layout,
+                                                        VkImageUsageFlags usage) {
     if constexpr (consts::DEBUG) {
         if (attachments_.find(attachment_name) != attachments_.end()) {
             Log::fatal("Attachment '%' was added multiple times to the same graphics pass!", attachment_name);
@@ -324,13 +328,14 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attac
     attachment.finalLayout = final_layout;
 
     attachments_[attachment_name].description = attachment;
+    attachments_[attachment_name].usage = usage;
     return *this;
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachmentSwapchain() {
     addAttachment(GraphicsPass::SwapchainName, device_.getSwapchainFormat(), VK_ATTACHMENT_LOAD_OP_CLEAR,
                   VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+                  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     return *this;
 }
 
@@ -362,6 +367,12 @@ GraphicsPassBuilder &GraphicsPassBuilder::addSubpassDependency(const std::string
     dependency.dstAccessFlags = dst_access_flags;
 
     subpassDependencyInfo_.emplace_back(dependency);
+    return *this;
+}
+
+GraphicsPassBuilder &GraphicsPassBuilder::setExtent(u32 width, u32 height) {
+    extent_.width = width;
+    extent_.height = height;
     return *this;
 }
 

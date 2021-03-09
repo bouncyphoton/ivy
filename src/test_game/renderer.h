@@ -16,7 +16,7 @@ public:
      * \brief Debug rendering mode
      */
     enum class DebugMode {
-        FULL, DIFFUSE, NORMAL, WORLD, DEPTH
+        FULL, DIFFUSE, NORMAL, WORLD, SHADOW_MAP
     };
 
     explicit Renderer(ivy::gfx::RenderDevice &render_device);
@@ -30,6 +30,8 @@ public:
 private:
     ivy::gfx::RenderDevice &device_;
     std::vector<ivy::gfx::GraphicsPass> passes_;
+
+    VkSampler shadowSampler_;
 };
 
 #endif // IVY_RENDERER_H
