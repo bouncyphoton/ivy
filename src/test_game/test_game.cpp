@@ -53,9 +53,15 @@ void TestGame::init() {
     entities_.back().setComponent(Transform(glm::vec3(0, 1, 5)));
     entities_.back().setComponent<Camera>();
 
-    // Add directional light
+    // Add red directional light
     entities_.emplace_back();
-    entities_.back().setComponent(DirectionalLight(glm::vec3(-0.1f, -1.0f, -0.1f)));
+    entities_.back().setTag("red_light");
+    entities_.back().setComponent(DirectionalLight(glm::vec3(-0.1f, -1.0f, 0.1f), glm::vec3(1, 0, 0)));
+
+    // Add blue directional light
+    entities_.emplace_back();
+    entities_.back().setTag("blue_light");
+    entities_.back().setComponent(DirectionalLight(glm::vec3(-0.1f, -1.0f, -0.1f), glm::vec3(0, 0, 1)));
 }
 
 void TestGame::update() {
@@ -87,8 +93,19 @@ void TestGame::update() {
     }
 
     // Update entities
+    f32 time = (f32) glfwGetTime();
     for (u32 i = 0; i < entities_.size(); ++i) {
         const Entity &entity = entities_[i];
+
+        // Move lights
+        if (entity.hasTag("red_light")) {
+            DirectionalLight *light = entity.getComponent<DirectionalLight>();
+            light->setDirection(glm::vec3(-0.1f, -1, std::sin(time) * 0.1));
+        }
+        if (entity.hasTag("blue_light")) {
+            DirectionalLight *light = entity.getComponent<DirectionalLight>();
+            light->setDirection(glm::vec3(-0.1f, -1, -std::sin(time) * 0.1));
+        }
 
         Transform *transform = entity.getComponent<Transform>();
         if (!transform) {
@@ -98,7 +115,6 @@ void TestGame::update() {
         // Move bunnies
         if (entity.hasTag("bunny")) {
             // Update the position for this entity
-            f32 time = (f32) glfwGetTime();
             f32 x = i - entities_.size() * 0.5f + 0.5f;
             transform->setPosition(glm::vec3(x, 1 + sinf(x + time), 0));
             transform->setRotation(glm::vec3(0, time, 0));

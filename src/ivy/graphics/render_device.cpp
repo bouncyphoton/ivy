@@ -474,7 +474,7 @@ SubpassLayout RenderDevice::createLayout(const LayoutBindingsMap_t &layout_bindi
 VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shaders,
                                                 const VertexDescription &vertex_description, VkPipelineLayout layout,
                                                 VkRenderPass render_pass, u32 subpass, u32 num_color_attachments,
-                                                bool has_depth_attachment) {
+                                                bool has_depth_attachment, const GraphicsPipelineState &state) {
     // Generate shader stages
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages(shaders.size());
     for (u32 i = 0; i < shaders.size(); ++i) {
@@ -540,15 +540,21 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     // Depth create info
     VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
     depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencilCreateInfo.depthTestEnable = VK_TRUE;
-    depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
-    depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencilCreateInfo.depthTestEnable = state.depthTestEnable ? VK_TRUE : VK_FALSE;
+    depthStencilCreateInfo.depthWriteEnable = state.depthWriteEnable ? VK_TRUE : VK_FALSE;
+    depthStencilCreateInfo.depthCompareOp = state.depthCompareOp;
 
     // Color blending
     VkPipelineColorBlendAttachmentState blendState = {};
     blendState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    blendState.blendEnable = VK_FALSE;
+    blendState.blendEnable = VK_TRUE;
+    blendState.srcColorBlendFactor = state.srcColorBlendFactor;
+    blendState.dstColorBlendFactor = state.dstColorBlendFactor;
+    blendState.colorBlendOp = state.colorBlendOp;
+    blendState.srcAlphaBlendFactor = state.srcAlphaBlendFactor;
+    blendState.dstAlphaBlendFactor = state.dstAlphaBlendFactor;
+    blendState.alphaBlendOp = state.alphaBlendOp;
 
     // We don't have independent blending enabled, so these must be the same for all attachments
     std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachmentStates(num_color_attachments, blendState);

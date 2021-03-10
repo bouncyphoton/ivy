@@ -260,8 +260,9 @@ GraphicsPass GraphicsPassBuilder::build() {
         // Create pipeline
         subpasses.emplace_back(
             device_.createGraphicsPipeline(
-                subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass, subpasses.size(),
-                subpassInfo.colorAttachmentNames_.size(), subpassInfo.depthAttachmentName_.has_value()
+                subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass,
+                subpasses.size(), subpassInfo.colorAttachmentNames_.size(), subpassInfo.depthAttachmentName_.has_value(),
+                subpassInfo.pipelineState_
             ),
             layout,
             subpass_name
@@ -427,6 +428,37 @@ SubpassBuilder &SubpassBuilder::addDepthAttachment(const std::string &attachment
 
     subpass_.depthAttachmentName_ = attachment_name;
 
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setDepthTesting(bool depth_testing) {
+    subpass_.pipelineState_.depthTestEnable = depth_testing;
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setDepthWriting(bool depth_writing) {
+    subpass_.pipelineState_.depthWriteEnable = depth_writing;
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setDepthCompareOp(VkCompareOp compare_op) {
+    subpass_.pipelineState_.depthCompareOp = compare_op;
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setColorBlending(VkBlendOp blend_op, VkBlendFactor src_blend_factor,
+                                                 VkBlendFactor dst_blend_factor) {
+    subpass_.pipelineState_.colorBlendOp = blend_op;
+    subpass_.pipelineState_.srcColorBlendFactor = src_blend_factor;
+    subpass_.pipelineState_.dstColorBlendFactor = dst_blend_factor;
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setAlphaBlending(VkBlendOp blend_op, VkBlendFactor src_blend_factor,
+                                                 VkBlendFactor dst_blend_factor) {
+    subpass_.pipelineState_.alphaBlendOp = blend_op;
+    subpass_.pipelineState_.srcAlphaBlendFactor = src_blend_factor;
+    subpass_.pipelineState_.dstAlphaBlendFactor = dst_blend_factor;
     return *this;
 }
 

@@ -36,6 +36,11 @@ public:
 
     void drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset, u32 first_instance);
 
+    void setViewport(f32 x, f32 y, f32 width, f32 height, f32 min_depth = 0.0f, f32 max_depth = 1.0f,
+                     bool flip_viewport = false);
+
+    // TODO: setScissor
+
     void copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, VkDeviceSize dst_offset = 0,
                     VkDeviceSize src_offset = 0);
 

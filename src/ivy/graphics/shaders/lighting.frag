@@ -18,11 +18,9 @@ layout (set = 1, binding = 1) uniform sampler2D uShadowMap;
 
 layout (set = 2, binding = 0) uniform PerLight {
     mat4 viewProjection;
-    vec3 direction;
-    vec3 color;
-    float intensity;
-    float shadowBias;
-    // TODO: region of shadow map
+    vec4 directionAndShadowBias;
+    vec4 colorAndIntensity;
+    vec4 shadowViewportNormalized;
 } uLight;
 
 const uint DEBUG_FULL    = 0;
@@ -38,25 +36,31 @@ vec2 sampleShadowMap(vec3 positionWS) {
 
     // To UV
     vec3 positionUV = positionLS.xyz / positionLS.w;
-    positionUV.xy = positionUV.xy * 0.5 + 0.5;
+    positionUV.xy   = positionUV.xy * 0.5 + 0.5;
 
-    float shadowMapDepth = texture(uShadowMap, vec2(positionUV.x, 1 - positionUV.y)).r;
-    float currentDepth = positionUV.z;
+    // Remap positionUV to shadow viewport
+    vec2 uv = positionUV.xy * uLight.shadowViewportNormalized.zw + uLight.shadowViewportNormalized.xy;
+
+    float shadowMapDepth = texture(uShadowMap, uv).r;
+    float currentDepth   = positionUV.z;
 
     return vec2(shadowMapDepth, currentDepth);
 }
 
-float getDirectionalLightIntensity(vec3 positionWS, vec3 normal) {
+float getDirectionalLightAttenuation(vec3 positionWS, vec3 normal) {
+    vec3  direction  = uLight.directionAndShadowBias.xyz;
+    float shadowBias = uLight.directionAndShadowBias.w;
+
     vec2  depths         = sampleShadowMap(positionWS);
     float shadowMapDepth = depths.x;
     float currentDepth   = depths.y;
-    float shadowTerm     = currentDepth - uLight.shadowBias < shadowMapDepth ? 1 : 0;
+    float shadowTerm     = currentDepth - shadowBias < shadowMapDepth ? 1 : 0;
 
     // TODO: pcf or something
 
-    float attenuation = max(0, dot(normal, -normalize(uLight.direction)));
+    float attenuation = max(0, dot(normal, -normalize(direction)));
 
-    return attenuation * shadowTerm * uLight.intensity;
+    return attenuation * shadowTerm;
 }
 
 float getAmbientFactor(vec3 positionWS) {
@@ -88,6 +92,10 @@ void main() {
     vec3 diffuse = subpassLoad(iDiffuse).rgb;
     vec3 normal = normalize(subpassLoad(iNormal).xyz);
 
+    vec3  lightDirection = uLight.directionAndShadowBias.xyz;
+    vec3  lightColor     = uLight.colorAndIntensity.rgb;
+    float lightIntensity = uLight.colorAndIntensity.a;
+
     // Derived variables
     vec2 uv       = vec2(gl_FragCoord.x, uFrame.resolution.y - gl_FragCoord.y) / uFrame.resolution;
     vec3 worldPos = depthToWorldPos(uv, depth, uFrame.invProjection, uFrame.invView);
@@ -98,7 +106,10 @@ void main() {
     switch (uFrame.debugMode) {
         case DEBUG_FULL:
             // TODO: remove temp hacks
-            color = max(getAmbientFactor(worldPos), getDirectionalLightIntensity(worldPos, normal)) * uLight.color * diffuse;
+            float ambient   = getAmbientFactor(worldPos);
+            float intensity = getDirectionalLightAttenuation(worldPos, normal) * lightIntensity;
+
+            color = max(ambient, intensity) * lightColor * diffuse;
             break;
         case DEBUG_DIFFUSE:
             color = diffuse;
@@ -110,7 +121,7 @@ void main() {
             color = fract(worldPos);
             break;
         case DEBUG_SHADOW_MAP:
-            color = texture(uShadowMap, vec2(uv.x, 1 - uv.y)).rrr;
+            color = texture(uShadowMap, uv.xy).rrr;
             break;
     }
 

@@ -42,22 +42,18 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     renderPassBeginInfo.clearValueCount = clearValues.size();
     renderPassBeginInfo.pClearValues = clearValues.data();
 
-    // Flip the viewport upside down
-    VkViewport viewport = {};
-    viewport.width = (f32) renderPassBeginInfo.renderArea.extent.width;
-    viewport.height = -1.0f * (f32) renderPassBeginInfo.renderArea.extent.height;
-    viewport.x = (f32) renderPassBeginInfo.renderArea.offset.x;
-    viewport.y = (f32) renderPassBeginInfo.renderArea.offset.y + (f32) renderPassBeginInfo.renderArea.extent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
     VkRect2D scissor = {};
     scissor.offset = {0, 0};
     scissor.extent = renderPassBeginInfo.renderArea.extent;
 
     // Start render pass, call user functions, end render pass
     vkCmdBeginRenderPass(commandBuffer_, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdSetViewport(commandBuffer_, 0, 1, &viewport);
+
+    // Set viewport (flipped upside down)
+    setViewport((f32) renderPassBeginInfo.renderArea.offset.x, (f32) renderPassBeginInfo.renderArea.offset.y,
+                (f32) renderPassBeginInfo.renderArea.extent.width, (f32) renderPassBeginInfo.renderArea.extent.height,
+                0.0f, 1.0f, true);
+
     vkCmdSetScissor(commandBuffer_, 0, 1, &scissor);
     func();
     vkCmdEndRenderPass(commandBuffer_);
@@ -96,6 +92,27 @@ void CommandBuffer::draw(u32 num_vertices, u32 num_instances, u32 first_vertex, 
 void CommandBuffer::drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset,
                                 u32 first_instance) {
     vkCmdDrawIndexed(commandBuffer_, num_indices, num_instances, first_index, vertex_offset, first_instance);
+}
+
+void CommandBuffer::setViewport(f32 x, f32 y, f32 width, f32 height, f32 min_depth, f32 max_depth, bool flip_viewport) {
+    VkViewport viewport = {};
+    if (flip_viewport) {
+        viewport.width = width;
+        viewport.height = -1.0f * height;
+        viewport.x = x;
+        viewport.y = y + height;
+        viewport.minDepth = min_depth;
+        viewport.maxDepth = max_depth;
+    } else {
+        viewport.width = width;
+        viewport.height = height;
+        viewport.x = x;
+        viewport.y = y;
+        viewport.minDepth = min_depth;
+        viewport.maxDepth = max_depth;
+    }
+
+    vkCmdSetViewport(commandBuffer_, 0, 1, &viewport);
 }
 
 void CommandBuffer::copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, VkDeviceSize dst_offset,

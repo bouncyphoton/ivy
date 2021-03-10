@@ -36,10 +36,9 @@ struct PerFrameLightingPass {
 
 struct PerLightLightingPass {
     alignas(16) glm::mat4 viewProjection;
-    alignas(16) glm::vec3 direction;
-    alignas(16) glm::vec3 color;
-    alignas(4) f32 intensity;
-    alignas(4) f32 shadowBias;
+    alignas(16) glm::vec4 directionAndShadowBias; // xyz = direction, w = shadow bias
+    alignas(16) glm::vec4 colorAndIntensity;      // xyz = color, w = intensity
+    alignas(16) glm::vec4 shadowViewportNormalized;
 };
 
 Renderer::Renderer(gfx::RenderDevice &render_device)
@@ -57,7 +56,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
     // Shadow map pass
     passes_.emplace_back(
         gfx::GraphicsPassBuilder(device_)
-        .setExtent(2048, 2048)
+        .setExtent(shadowMapSize_, shadowMapSize_)
         .addAttachment("depth", depthFormat, VK_IMAGE_USAGE_SAMPLED_BIT)
         .addSubpass("shadow_pass",
                     gfx::SubpassBuilder()
@@ -99,10 +98,10 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .build()
                    )
         .addSubpass("lighting_pass",
-                    // TODO: additive blending
                     gfx::SubpassBuilder()
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/lighting.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/lighting.frag.spv")
+                    .setColorBlending(VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE)
                     .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
                     .addInputAttachmentDescriptor(0, 0, "diffuse")
                     .addInputAttachmentDescriptor(0, 1, "normal")
@@ -175,14 +174,31 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
     cmd.executeGraphicsPass(device_, shadowPass, [&]() {
         cmd.bindGraphicsPipeline(shadowPass, 0);
 
-        // TODO: share shadow map across lights
+        // TODO: a 'get by component type' function would be nice (entity manager)
 
-        // TODO: get by component type or something ?
+        // Count number of shadow casting lights
+        numShadows = 0;
+        for (const auto &lightEntity : entities) {
+            DirectionalLight *light = lightEntity.getComponent<DirectionalLight>();
+            if (light && light->castsShadows()) {
+                ++numShadows;
+            }
+        }
+
+        shadowsPerSide = (u32) std::ceil(std::sqrt(numShadows));
+        shadowSize = (u32) shadowMapSize_ / shadowsPerSide;
+        u32 shadowIdx = 0;
+
+        // Render shadow maps
         for (const auto &lightEntity : entities) {
             DirectionalLight *light = lightEntity.getComponent<DirectionalLight>();
             if (!light || !light->castsShadows()) {
                 continue;
             }
+
+            // Calculate viewport
+            glm::vec4 viewport = getShadowViewport(shadowIdx);
+            cmd.setViewport(viewport.x, viewport.y, viewport.z, viewport.w);
 
             // Light data
             PerLightShadowPass perLight = {};
@@ -214,6 +230,8 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
                     }
                 }
             }
+
+            ++shadowIdx;
         }
     });
 
@@ -317,6 +335,7 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
             }
 
             // Draw lights
+            u32 shadowIdx = 0;
             for (const auto &lightEntity : entities) {
                 DirectionalLight *light = lightEntity.getComponent<DirectionalLight>();
                 if (!light) {
@@ -325,10 +344,12 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
 
                 PerLightLightingPass perLight = {};
                 perLight.viewProjection = light->calculateViewProjectionMatrix(cameraTransform, camera);
-                perLight.direction = light->getDirection();
-                perLight.color = light->getColor();
-                perLight.intensity = light->getIntensity();
-                perLight.shadowBias = light->getShadowBias();
+                perLight.directionAndShadowBias = glm::vec4(light->getDirection(), light->getShadowBias());
+                perLight.colorAndIntensity = glm::vec4(light->getColor(), light->getIntensity());
+                if (light->castsShadows()) {
+                    perLight.shadowViewportNormalized = getShadowViewport(shadowIdx) / (f32) shadowMapSize_;
+                    ++shadowIdx;
+                }
 
                 gfx::DescriptorSet perLightSet(lightingPass, subpassIdx, 2);
                 perLightSet.setUniformBuffer(0, perLight);
@@ -341,4 +362,13 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
     });
 
     device_.endFrame();
+}
+
+glm::vec4 Renderer::getShadowViewport(ivy::u32 shadow_idx) const {
+    return glm::vec4(
+               (shadow_idx % shadowsPerSide) * shadowSize,
+               (shadow_idx / shadowsPerSide) * shadowSize,
+               shadowSize,
+               shadowSize
+           );
 }

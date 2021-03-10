@@ -181,9 +181,9 @@ private:
         }
 
         // Find first unescaped %
-        for (size_t i = 1; i < format.size(); ++i) {
+        for (size_t i = 0; i < format.size(); ++i) {
             if (format[i] == '%') {
-                if (format[i - 1] == '\\') {
+                if (i != 0 && format[i - 1] == '\\') {
                     // Remove backslash and continue
                     format.erase(i, 1);
                     --i;

@@ -24,25 +24,44 @@ public:
         return direction_;
     }
 
+    void setDirection(glm::vec3 direction) {
+        direction_ = direction;
+    }
+
     [[nodiscard]] glm::vec3 getColor() const {
         return color_;
+    }
+
+    void setColor(glm::vec3 color) {
+        color_ = color;
     }
 
     [[nodiscard]] f32 getIntensity() const {
         return intensity_;
     }
 
+    void setIntensity(f32 intensity) {
+        intensity_ = intensity;
+    }
+
     [[nodiscard]] bool castsShadows() const {
         return castsShadows_;
+    }
+
+    void setShadowCasting(bool casts_shadows) {
+        castsShadows_ = casts_shadows;
     }
 
     [[nodiscard]] f32 getShadowBias() const {
         return shadowBias_;
     }
 
-    [[nodiscard]] glm::mat4 calculateViewProjectionMatrix(const Transform &transform, const Camera &camera) const {
-        (void)camera;
+    void setShadowBias(float bias) {
+        shadowBias_ = bias;
+    }
 
+    [[nodiscard]] glm::mat4 calculateViewProjectionMatrix(const Transform &transform,
+                                                          [[maybe_unused]] const Camera &camera) const {
         // TODO: calculate from camera frustum instead of hardcoding values
         glm::mat4 projection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.01f, 40.0f);
         glm::mat4 view = glm::lookAt(transform.getPosition() - direction_ * 20.0f, transform.getPosition(), Transform::UP);

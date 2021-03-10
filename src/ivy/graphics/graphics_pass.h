@@ -17,6 +17,24 @@ class RenderDevice;
 
 // TODO: push constants
 
+/**
+ * \brief Describes the state of a graphics pipeline for a subpass
+ */
+struct GraphicsPipelineState {
+    bool depthTestEnable = true;
+    bool depthWriteEnable = true;
+    VkCompareOp depthCompareOp = VK_COMPARE_OP_LESS;
+
+    VkBlendOp colorBlendOp = VK_BLEND_OP_ADD;
+    VkBlendFactor srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    VkBlendFactor dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    VkBlendOp alphaBlendOp = VK_BLEND_OP_ADD;
+    VkBlendFactor srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    VkBlendFactor dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+
+    // TODO: add more state settings
+};
+
 // <set, <binding, VkDescriptorSetLayoutBinding>>
 using LayoutBindingsMap_t = std::map<u32, std::map<u32, VkDescriptorSetLayoutBinding>>;
 
@@ -174,6 +192,7 @@ private:
     std::optional<std::string> depthAttachmentName_;
 
     LayoutBindingsMap_t descriptors_;
+    GraphicsPipelineState pipelineState_;
 };
 
 /**
@@ -241,6 +260,45 @@ public:
      * \return SubpassBuilder
      */
     SubpassBuilder &addDepthAttachment(const std::string &attachment_name);
+
+    /**
+     * \brief Set the depth testing pipeline state
+     * \param depth_testing Whether or not depth testing should be enabled
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setDepthTesting(bool depth_testing);
+
+    /**
+     * \brief Set the depth writing pipeline state
+     * \param depth_writing Whether or not depth writing should be enabled
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setDepthWriting(bool depth_writing);
+
+    /**
+     * \brief Set the depth compare function
+     * \param compare_op Depth compare function
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setDepthCompareOp(VkCompareOp compare_op);
+
+    /**
+     * \brief Set the color blending options
+     * \param blend_op Color blend operation
+     * \param src_blend_factor Blending factor for src factors
+     * \param dst_blend_factor Blending factor for dst factors
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setColorBlending(VkBlendOp blend_op, VkBlendFactor src_blend_factor, VkBlendFactor dst_blend_factor);
+
+    /**
+     * \brief Sets the alpha blending options
+     * \param blend_op Alpha blend operation
+     * \param src_blend_factor Blending factor for src factors
+     * \param dst_blend_factor Blending factor for dst factors
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setAlphaBlending(VkBlendOp blend_op, VkBlendFactor src_blend_factor, VkBlendFactor dst_blend_factor);
 
     /**
      * \brief Build the subpass

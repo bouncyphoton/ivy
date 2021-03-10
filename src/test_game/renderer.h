@@ -1,6 +1,7 @@
 #ifndef IVY_RENDERER_H
 #define IVY_RENDERER_H
 
+#include "ivy/types.h"
 #include "ivy/graphics/render_device.h"
 #include "ivy/graphics/graphics_pass.h"
 #include "ivy/graphics/vertex.h"
@@ -28,9 +29,15 @@ public:
     void render(const std::vector<ivy::Entity> &entities, DebugMode debug_mode = DebugMode::FULL);
 
 private:
+    glm::vec4 getShadowViewport(ivy::u32 shadow_idx) const;
+
     ivy::gfx::RenderDevice &device_;
     std::vector<ivy::gfx::GraphicsPass> passes_;
 
+    const ivy::u32 shadowMapSize_ = 2048;
+    ivy::u32 numShadows = 0;
+    ivy::u32 shadowsPerSide = 0;
+    ivy::u32 shadowSize = 0;
     VkSampler shadowSampler_;
 };
 
