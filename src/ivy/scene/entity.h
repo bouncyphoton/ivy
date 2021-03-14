@@ -1,16 +1,16 @@
 #ifndef IVY_ENTITY_H
 #define IVY_ENTITY_H
 
-#include "ivy/entity/components/component.h"
+#include "ivy/scene/components/component.h"
 #include <unordered_map>
 #include <memory>
 #include <typeindex>
+#include <ostream>
 
 namespace ivy {
 
 class Entity {
 public:
-
     /**
      * \brief Search for and get a certain component from the entity
      * \tparam T The component type
@@ -42,6 +42,22 @@ public:
     template <typename T>
     void removeComponent();
 
+    /**
+     * \brief Check if this entity has all the components in the parameter pack
+     * \tparam Components Parameter pack of components
+     * \return Whether or not all of them are present
+     */
+    template <typename... Components>
+    bool hasAllComponents() const;
+
+    /**
+     * \brief Check if this entity has at least one of the components in the parameter pack
+     * \tparam Components Parameter pack of components
+     * \return Whether or not at least one of them is present
+     */
+    template <typename... Components>
+    bool hasAnyComponents() const;
+
     void setTag(const std::string &tag) {
         tag_ = tag;
     }
@@ -49,6 +65,8 @@ public:
     bool hasTag(const std::string &tag) const {
         return tag_ == tag;
     }
+
+    friend std::ostream &operator<<(std::ostream &os, const Entity &entity);
 
 private:
     std::string tag_;

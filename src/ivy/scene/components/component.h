@@ -1,12 +1,16 @@
 #ifndef IVY_COMPONENT_H
 #define IVY_COMPONENT_H
 
+#include <string>
+
 namespace ivy {
 
 /**
- * \brief An empty component class for components to inherit from. Prevent setting components that do nothing
+ * \brief Component base class
  */
 class Component {
+public:
+    [[nodiscard]] virtual std::string getName() const = 0;
 };
 
 }

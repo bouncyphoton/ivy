@@ -20,7 +20,7 @@ private:
 
     ivy::Engine engine_;
     Renderer renderer_;
-    std::vector<ivy::Entity> entities_;
+    ivy::Scene scene_;
 
     Renderer::DebugMode debugMode_ = Renderer::DebugMode::FULL;
 };

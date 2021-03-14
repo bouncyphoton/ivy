@@ -1,7 +1,7 @@
 #ifndef IVY_MODEL_H
 #define IVY_MODEL_H
 
-#include "ivy/entity/components/component.h"
+#include "ivy/scene/components/component.h"
 #include "ivy/resources/model_resource.h"
 
 namespace ivy {
@@ -13,6 +13,10 @@ class Model : public Component {
 public:
     explicit Model(const ModelResource &mesh_resource)
         : modelResource_(mesh_resource) {}
+
+    [[nodiscard]] std::string getName() const override {
+        return "Model";
+    }
 
     [[nodiscard]] const std::vector<gfx::Mesh> &getMeshes() const {
         return modelResource_.get();

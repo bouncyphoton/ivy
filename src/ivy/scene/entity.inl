@@ -40,4 +40,31 @@ void Entity::removeComponent() {
     components_.erase(typeid(T));
 }
 
+template<typename... Components>
+bool Entity::hasAllComponents() const {
+    return (... && getComponent<Components>());
+}
+
+template<typename... Components>
+bool Entity::hasAnyComponents() const {
+    return (... || getComponent<Components>());
+}
+
+inline std::ostream &operator<<(std::ostream &os, const Entity &entity) {
+    os << "[ tag: " << entity.tag_ << ", components: [ ";
+
+    bool first = true;
+    for (auto &c : entity.components_) {
+        if (first) {
+            os << c.second->getName();
+            first = false;
+        } else {
+            os << ", " << c.second->getName();
+        }
+    }
+    os << " ] ]";
+
+    return os;
+}
+
 }

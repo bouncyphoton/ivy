@@ -6,7 +6,7 @@
 #include "ivy/graphics/graphics_pass.h"
 #include "ivy/graphics/vertex.h"
 #include "ivy/graphics/geometry.h"
-#include "ivy/entity/entity.h"
+#include "ivy/scene/scene.h"
 
 /**
  * \brief High level renderer
@@ -26,10 +26,10 @@ public:
     /**
      * \brief Render a frame
      */
-    void render(const std::vector<ivy::Entity> &entities, DebugMode debug_mode = DebugMode::FULL);
+    void render(ivy::Scene &scene, DebugMode debug_mode = DebugMode::FULL);
 
 private:
-    glm::vec4 getShadowViewport(ivy::u32 shadow_idx) const;
+    [[nodiscard]] glm::vec4 getShadowViewport(ivy::u32 shadow_idx) const;
 
     ivy::gfx::RenderDevice &device_;
     std::vector<ivy::gfx::GraphicsPass> passes_;

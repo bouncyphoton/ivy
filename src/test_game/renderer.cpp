@@ -2,10 +2,10 @@
 #include "ivy/log.h"
 #include "ivy/graphics/vertex.h"
 #include "ivy/graphics/texture2d.h"
-#include "ivy/entity/components/transform.h"
-#include "ivy/entity/components/model.h"
-#include "ivy/entity/components/camera.h"
-#include "ivy/entity/components/light.h"
+#include "ivy/scene/components/transform.h"
+#include "ivy/scene/components/model.h"
+#include "ivy/scene/components/camera.h"
+#include "ivy/scene/components/light.h"
 #include <glm/gtc/matrix_transform.hpp>
 
 // TODO: compute pass
@@ -129,25 +129,21 @@ Renderer::~Renderer() {
     LOG_CHECKPOINT();
 }
 
-void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode) {
+void Renderer::render(Scene &scene, DebugMode debug_mode) {
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
     gfx::GraphicsPass &shadowPass = passes_.at(0);
     gfx::GraphicsPass &lightingPass = passes_.at(1);
 
     // Find camera in entities
+    EntityHandle cameraEntity = scene.findEntityWithAllComponents<Camera, Transform>();
     Camera camera;
     Transform cameraTransform;
-
-    // Set projection and view matrix from first entity with camera component
-    auto cameraIt = std::find_if(entities.begin(), entities.end(), [](const Entity & e) {
-        return e.getComponent<Camera>() && e.getComponent<Transform>();
-    });
-    if (cameraIt != entities.end()) {
-        camera = *cameraIt->getComponent<Camera>();
-        cameraTransform = *cameraIt->getComponent<Transform>();
-    } else {
+    if (!cameraEntity) {
         Log::warn("No entities in the scene have a Camera and Transform component");
+    } else {
+        camera = *cameraEntity->getComponent<Camera>();
+        cameraTransform = *cameraEntity->getComponent<Transform>();
     }
 
     // Transition shadow map back from previous frame for writing
@@ -174,13 +170,13 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
     cmd.executeGraphicsPass(device_, shadowPass, [&]() {
         cmd.bindGraphicsPipeline(shadowPass, 0);
 
-        // TODO: a 'get by component type' function would be nice (entity manager)
+        std::vector<EntityHandle> lightEntities = scene.findEntitiesWithAnyComponents<DirectionalLight>();
 
         // Count number of shadow casting lights
         numShadows = 0;
-        for (const auto &lightEntity : entities) {
-            DirectionalLight *light = lightEntity.getComponent<DirectionalLight>();
-            if (light && light->castsShadows()) {
+        for (auto &lightEntity : lightEntities) {
+            DirectionalLight *dirLight = lightEntity->getComponent<DirectionalLight>();
+            if (dirLight && dirLight->castsShadows()) {
                 ++numShadows;
             }
         }
@@ -190,9 +186,9 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
         u32 shadowIdx = 0;
 
         // Render shadow maps
-        for (const auto &lightEntity : entities) {
-            DirectionalLight *light = lightEntity.getComponent<DirectionalLight>();
-            if (!light || !light->castsShadows()) {
+        for (auto &lightEntity : lightEntities) {
+            DirectionalLight *dirLight = lightEntity->getComponent<DirectionalLight>();
+            if (dirLight && !dirLight->castsShadows()) {
                 continue;
             }
 
@@ -202,7 +198,7 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
 
             // Light data
             PerLightShadowPass perLight = {};
-            perLight.viewProjection = light->calculateViewProjectionMatrix(cameraTransform, camera);
+            perLight.viewProjection = dirLight->calculateViewProjectionMatrix(cameraTransform, camera);
 
             // Send to shader
             gfx::DescriptorSet perLightSet(shadowPass, 0, 0);
@@ -210,24 +206,22 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
             cmd.setDescriptorSet(device_, shadowPass, perLightSet);
 
             // Go over entities and draw
-            for (const auto &entity : entities) {
-                Transform *transform = entity.getComponent<Transform>();
-                Model *model = entity.getComponent<Model>();
+            for (EntityHandle &entity : scene.findEntitiesWithAllComponents<Transform, Model>()) {
+                Transform *transform = entity->getComponent<Transform>();
+                Model *model = entity->getComponent<Model>();
 
-                if (transform && model) {
-                    PerMeshShadowPass perMesh = {};
-                    perMesh.model = transform->getModelMatrix();
+                PerMeshShadowPass perMesh = {};
+                perMesh.model = transform->getModelMatrix();
 
-                    // Iterate over meshes in model
-                    for (const gfx::Mesh &mesh : model->getMeshes()) {
-                        // Send to shader
-                        gfx::DescriptorSet perMeshSet(shadowPass, 0, 1);
-                        perMeshSet.setUniformBuffer(0, perMesh);
-                        cmd.setDescriptorSet(device_, shadowPass, perMeshSet);
+                // Iterate over meshes in model
+                for (const gfx::Mesh &mesh : model->getMeshes()) {
+                    // Send to shader
+                    gfx::DescriptorSet perMeshSet(shadowPass, 0, 1);
+                    perMeshSet.setUniformBuffer(0, perMesh);
+                    cmd.setDescriptorSet(device_, shadowPass, perMeshSet);
 
-                        // Draw this mesh
-                        mesh.getGeometry().draw(cmd);
-                    }
+                    // Draw this mesh
+                    mesh.getGeometry().draw(cmd);
                 }
             }
 
@@ -274,31 +268,29 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
                                        cameraTransform.getPosition() + cameraTransform.getForward(), Transform::UP);
 
             // Go over entities and draw
-            for (const auto &entity : entities) {
-                Transform *transform = entity.getComponent<Transform>();
-                Model *model         = entity.getComponent<Model>();
+            for (EntityHandle &entity : scene.findEntitiesWithAllComponents<Transform, Model>()) {
+                Transform *transform = entity->getComponent<Transform>();
+                Model *model         = entity->getComponent<Model>();
 
-                if (transform && model) {
-                    // Set the model and normal matrix
-                    mvpData.model = transform->getModelMatrix();
-                    mvpData.normal = glm::inverse(glm::transpose(mvpData.model));
+                // Set the model and normal matrix
+                mvpData.model = transform->getModelMatrix();
+                mvpData.normal = glm::inverse(glm::transpose(mvpData.model));
 
-                    // Iterate over meshes in model
-                    for (const gfx::Mesh &mesh : model->getMeshes()) {
-                        // Put MVP data in a descriptor set and bind it
-                        gfx::DescriptorSet mvpSet(lightingPass, subpassIdx, 0);
-                        mvpSet.setUniformBuffer(0, mvpData);
-                        cmd.setDescriptorSet(device_, lightingPass, mvpSet);
+                // Iterate over meshes in model
+                for (const gfx::Mesh &mesh : model->getMeshes()) {
+                    // Put MVP data in a descriptor set and bind it
+                    gfx::DescriptorSet mvpSet(lightingPass, subpassIdx, 0);
+                    mvpSet.setUniformBuffer(0, mvpData);
+                    cmd.setDescriptorSet(device_, lightingPass, mvpSet);
 
-                        // Material data
-                        const gfx::Material &mat = mesh.getMaterial();
-                        gfx::DescriptorSet materialSet(lightingPass, subpassIdx, 1);
-                        materialSet.setTexture(0, mat.getDiffuseTexture());
-                        cmd.setDescriptorSet(device_, lightingPass, materialSet);
+                    // Material data
+                    const gfx::Material &mat = mesh.getMaterial();
+                    gfx::DescriptorSet materialSet(lightingPass, subpassIdx, 1);
+                    materialSet.setTexture(0, mat.getDiffuseTexture());
+                    cmd.setDescriptorSet(device_, lightingPass, materialSet);
 
-                        // Draw this mesh
-                        mesh.getGeometry().draw(cmd);
-                    }
+                    // Draw this mesh
+                    mesh.getGeometry().draw(cmd);
                 }
             }
         }
@@ -336,27 +328,26 @@ void Renderer::render(const std::vector<Entity> &entities, DebugMode debug_mode)
 
             // Draw lights
             u32 shadowIdx = 0;
-            for (const auto &lightEntity : entities) {
-                DirectionalLight *light = lightEntity.getComponent<DirectionalLight>();
-                if (!light) {
-                    continue;
+            for (auto &lightEntity : scene.findEntitiesWithAnyComponents<DirectionalLight>()) {
+                DirectionalLight *dirLight = lightEntity->getComponent<DirectionalLight>();
+
+                if (dirLight) {
+                    PerLightLightingPass perLight = {};
+                    perLight.viewProjection = dirLight->calculateViewProjectionMatrix(cameraTransform, camera);
+                    perLight.directionAndShadowBias = glm::vec4(dirLight->getDirection(), dirLight->getShadowBias());
+                    perLight.colorAndIntensity = glm::vec4(dirLight->getColor(), dirLight->getIntensity());
+                    if (dirLight->castsShadows()) {
+                        perLight.shadowViewportNormalized = getShadowViewport(shadowIdx) / (f32) shadowMapSize_;
+                        ++shadowIdx;
+                    }
+
+                    gfx::DescriptorSet perLightSet(lightingPass, subpassIdx, 2);
+                    perLightSet.setUniformBuffer(0, perLight);
+                    cmd.setDescriptorSet(device_, lightingPass, perLightSet);
+
+                    // Draw our fullscreen triangle
+                    cmd.draw(3, 1, 0, 0);
                 }
-
-                PerLightLightingPass perLight = {};
-                perLight.viewProjection = light->calculateViewProjectionMatrix(cameraTransform, camera);
-                perLight.directionAndShadowBias = glm::vec4(light->getDirection(), light->getShadowBias());
-                perLight.colorAndIntensity = glm::vec4(light->getColor(), light->getIntensity());
-                if (light->castsShadows()) {
-                    perLight.shadowViewportNormalized = getShadowViewport(shadowIdx) / (f32) shadowMapSize_;
-                    ++shadowIdx;
-                }
-
-                gfx::DescriptorSet perLightSet(lightingPass, subpassIdx, 2);
-                perLightSet.setUniformBuffer(0, perLight);
-                cmd.setDescriptorSet(device_, lightingPass, perLightSet);
-
-                // Draw our fullscreen triangle
-                cmd.draw(3, 1, 0, 0);
             }
         }
     });

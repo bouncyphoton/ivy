@@ -1,7 +1,7 @@
 #ifndef IVY_LIGHT_H
 #define IVY_LIGHT_H
 
-#include "ivy/entity/components/component.h"
+#include "ivy/scene/components/component.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -19,6 +19,10 @@ public:
                      bool casts_shadows = true, f32 shadow_bias = 0.005f)
         : direction_(direction), color_(color), intensity_(intensity),
           castsShadows_(casts_shadows), shadowBias_(shadow_bias) {}
+
+    [[nodiscard]] std::string getName() const override {
+        return "DirectionalLight";
+    }
 
     [[nodiscard]] glm::vec3 getDirection() const {
         return direction_;
