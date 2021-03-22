@@ -609,13 +609,16 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
 
 Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
     VkRenderPass renderPass = pass.getVkRenderPass();
+    const std::map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
+
+    // How many framebuffers this render pass needs depends on whether or not it outputs to swapchain
+    u32 numFramebuffers = attachmentInfos.find(GraphicsPass::SwapchainName) == attachmentInfos.end()
+                          ? 1
+                          : swapchainImages_.size();
 
     // Create framebuffers if they don't exist
-    if (framebuffers_[renderPass].size() != swapchainImageViews_.size()) {
-        const std::map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
-
-        // Per in-flight frame
-        for (u32 frame = 0; frame < swapchainImages_.size(); ++frame) {
+    if (framebuffers_[renderPass].empty()) {
+        for (u32 frame = 0; frame < numFramebuffers; ++frame) {
             // Unordered map and vector hold almost the same data.
             // unordered_map is for keeping track of views by attachment name
             // vector is for framebuffer create info
@@ -623,13 +626,18 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
             std::unordered_map<std::string, VkImage> attachmentImages;
             std::vector<VkImageView> viewsVector;
 
+            // Need to create resources if it's the first framebuffer
+            bool firstFramebuffer = (frame == 0);
+
             // Get/create image view for each attachment in graphics pass
             for (const auto &infoPair : attachmentInfos) {
+                VkImageView view = VK_NULL_HANDLE;
+                VkImage image = VK_NULL_HANDLE;
+
                 if (infoPair.first == GraphicsPass::SwapchainName) {
-                    attachmentViews[infoPair.first] = swapchainImageViews_[frame];
-                    attachmentImages[infoPair.first] = swapchainImages_[frame];
-                    viewsVector.emplace_back(swapchainImageViews_[frame]);
-                } else {
+                    view = swapchainImageViews_[frame];
+                    image = swapchainImages_[frame];
+                } else if (firstFramebuffer) {
                     const AttachmentInfo &desc = infoPair.second;
 
                     // TODO: support non-2D attachments (imageCI.imageType, imageCI.extent, imageViewCI.viewType) ?
@@ -652,7 +660,6 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                     VmaAllocationCreateInfo allocCI = {};
                     allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-                    VkImage image;
                     VmaAllocation allocation;
                     VK_CHECKF(vmaCreateImage(allocator_, &imageCI, &allocCI, &image, &allocation, nullptr));
                     cleanupStack_.emplace([ = ]() {
@@ -678,16 +685,19 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                     imageViewCI.subresourceRange.baseArrayLayer = 0;
                     imageViewCI.subresourceRange.layerCount = 1;
 
-                    VkImageView view;
                     VK_CHECKF(vkCreateImageView(device_, &imageViewCI, nullptr, &view));
                     cleanupStack_.emplace([ = ]() {
                         vkDestroyImageView(device_, view, nullptr);
                     });
-
-                    attachmentViews[infoPair.first] = view;
-                    attachmentImages[infoPair.first] = image;
-                    viewsVector.emplace_back(view);
+                } else {
+                    // We can re-use already created attachments
+                    view = framebuffers_[renderPass].front().getView(infoPair.first);
+                    image = framebuffers_[renderPass].front().getImage(infoPair.first);
                 }
+
+                attachmentViews[infoPair.first] = view;
+                attachmentImages[infoPair.first] = image;
+                viewsVector.emplace_back(view);
             }
 
             // Create the framebuffer for this frame and render pass
@@ -711,7 +721,7 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
         }
     }
 
-    return framebuffers_[renderPass][swapImageIndex_];
+    return framebuffers_[renderPass][swapImageIndex_ % numFramebuffers];
 }
 
 VkBuffer RenderDevice::createVertexBuffer(const void *data, VkDeviceSize size) {
