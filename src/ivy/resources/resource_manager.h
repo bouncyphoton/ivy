@@ -36,13 +36,13 @@ private:
     std::string resourceDirectory_;
 
     std::unordered_map<std::string, std::unique_ptr<std::vector<gfx::Mesh>>> modelMeshes_;
-    std::unordered_map<std::string, std::unique_ptr<gfx::Texture2D>> textures_;
+    std::unordered_map<std::string, std::unique_ptr<gfx::Texture>> textures_;
 
-    gfx::Texture2D *textureWhite_;
-    gfx::Texture2D *textureBlackOpaque_;
-    gfx::Texture2D *textureBlackTransparent_;
-    gfx::Texture2D *textureNormal_;
-    gfx::Texture2D *textureMissing_;
+    gfx::Texture *textureWhite_;
+    gfx::Texture *textureBlackOpaque_;
+    gfx::Texture *textureBlackTransparent_;
+    gfx::Texture *textureNormal_;
+    gfx::Texture *textureMissing_;
 };
 
 }

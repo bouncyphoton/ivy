@@ -631,14 +631,24 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
 
             // Get/create image view for each attachment in graphics pass
             for (const auto &infoPair : attachmentInfos) {
+                const AttachmentInfo &desc = infoPair.second;
                 VkImageView view = VK_NULL_HANDLE;
                 VkImage image = VK_NULL_HANDLE;
 
                 if (infoPair.first == GraphicsPass::SwapchainName) {
+                    // Using swapchain image & imageview
                     view = swapchainImageViews_[frame];
                     image = swapchainImages_[frame];
-                } else if (firstFramebuffer) {
-                    const AttachmentInfo &desc = infoPair.second;
+                } else if (desc.texture) {
+                    // The image & image for this attachment was passed to the graphics pass
+                    view = desc.texture->getImageView();
+                    image = desc.texture->getImage();
+                } else if (!firstFramebuffer) {
+                    // The image & imageview was already created
+                    view = framebuffers_[renderPass].front().getView(infoPair.first);
+                    image = framebuffers_[renderPass].front().getImage(infoPair.first);
+                } else {
+                    // Need to create image & imageview for this attachment
 
                     // TODO: support non-2D attachments (imageCI.imageType, imageCI.extent, imageViewCI.viewType) ?
 
@@ -689,10 +699,6 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                     cleanupStack_.emplace([ = ]() {
                         vkDestroyImageView(device_, view, nullptr);
                     });
-                } else {
-                    // We can re-use already created attachments
-                    view = framebuffers_[renderPass].front().getView(infoPair.first);
-                    image = framebuffers_[renderPass].front().getImage(infoPair.first);
                 }
 
                 attachmentViews[infoPair.first] = view;
@@ -740,95 +746,78 @@ VkBuffer RenderDevice::createIndexBuffer(const void *data, VkDeviceSize size) {
     return createBufferGPU(data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 }
 
-std::pair<VkImage, VkImageView> RenderDevice::createTextureGPUFromData(u32 width, u32 height, VkFormat format,
+std::pair<VkImage, VkImageView> RenderDevice::createTextureGPUFromData(VkImageCreateInfo image_ci,
+                                                                       VkImageViewCreateInfo image_view_ci,
                                                                        const void *data, VkDeviceSize size) {
     // Create staging buffer
-    std::pair<VkBuffer, VmaAllocation> stagingBuffer = createStagingBufferCPU(data, size);
+    std::pair<VkBuffer, VmaAllocation> stagingBuffer;
+    if (size > 0) {
+        stagingBuffer = createStagingBufferCPU(data, size);
+    }
 
     // Create image
-    VkImageCreateInfo imageCI = {};
-    imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageCI.imageType = VK_IMAGE_TYPE_2D;
-    imageCI.format = format;
-    imageCI.extent.width = width;
-    imageCI.extent.height = height;
-    imageCI.extent.depth = 1;
-    imageCI.mipLevels = 1;
-    imageCI.arrayLayers = 1;
-    imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_ci.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     VmaAllocationCreateInfo allocCI = {};
     allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
     VkImage image;
     VmaAllocation allocation;
-    VK_CHECKF(vmaCreateImage(allocator_, &imageCI, &allocCI, &image, &allocation, nullptr));
+    VK_CHECKF(vmaCreateImage(allocator_, &image_ci, &allocCI, &image, &allocation, nullptr));
     cleanupStack_.emplace([ = ]() {
         vmaDestroyImage(allocator_, image, allocation);
     });
 
-    // Copy data into image
-    submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
-        // Transition image for copying buffer into it
-        {
-            VkImageMemoryBarrier barrier = {};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.image = image;
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            barrier.subresourceRange.levelCount = 1;
-            barrier.subresourceRange.layerCount = 1;
+    if (size > 0) {
+        // Copy data into image
+        submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
+            // Transition image for copying buffer into it
+            {
+                VkImageMemoryBarrier barrier = {};
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.srcAccessMask = 0;
+                barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier.image = image;
+                barrier.subresourceRange = image_view_ci.subresourceRange;
 
-            cmd.pipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                0, 0, nullptr, 0, nullptr, 1, &barrier);
-        }
+                cmd.pipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                    0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
 
-        // Copy buffer into it
-        {
-            cmd.copyBufferToImage(stagingBuffer.first, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  VK_IMAGE_ASPECT_COLOR_BIT, width, height);
-        }
+            // Copy buffer into it
+            {
+                cmd.copyBufferToImage(stagingBuffer.first, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                      image_view_ci.subresourceRange.aspectMask, image_ci.extent.width,
+                                      image_ci.extent.height, image_ci.extent.depth, image_ci.arrayLayers);
+            }
 
-        // Transition image for reading in shaders
-        {
-            VkImageMemoryBarrier barrier = {};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            barrier.image = image;
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            barrier.subresourceRange.levelCount = 1;
-            barrier.subresourceRange.layerCount = 1;
+            // Transition image for reading in shaders
+            {
+                VkImageMemoryBarrier barrier = {};
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                barrier.image = image;
+                barrier.subresourceRange = image_view_ci.subresourceRange;
 
-            cmd.pipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                                0, 0, nullptr, 0, nullptr, 1, &barrier);
-        }
-    });
+                cmd.pipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                    0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
+        });
 
-    // Destroy staging buffer, we're done using it
-    vmaDestroyBuffer(allocator_, stagingBuffer.first, stagingBuffer.second);
+        // Destroy staging buffer, we're done using it
+        vmaDestroyBuffer(allocator_, stagingBuffer.first, stagingBuffer.second);
+    }
 
     // Create image view
-    VkImageViewCreateInfo imageViewCI = {};
-    imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imageViewCI.image = image;
-    imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imageViewCI.format = format;
-    imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageViewCI.subresourceRange.levelCount = 1;
-    imageViewCI.subresourceRange.layerCount = 1;
+    image_view_ci.image = image;
 
     VkImageView imageView;
-    VK_CHECKF(vkCreateImageView(device_, &imageViewCI, nullptr, &imageView));
+    VK_CHECKF(vkCreateImageView(device_, &image_view_ci, nullptr, &imageView));
     cleanupStack_.emplace([ = ]() {
         vkDestroyImageView(device_, imageView, nullptr);
     });

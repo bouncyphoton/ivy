@@ -1,6 +1,7 @@
 #include "graphics_pass.h"
 #include "ivy/graphics/render_device.h"
 #include "ivy/graphics/vk_utils.h"
+#include "ivy/graphics/texture.h"
 #include "ivy/log.h"
 #include "ivy/consts.h"
 #include <unordered_set>
@@ -271,6 +272,13 @@ GraphicsPass GraphicsPassBuilder::build() {
 
     // Create the graphics pass
     return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts, extent_);
+}
+
+GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name,
+                                                        const gfx::Texture &texture) {
+    addAttachment(attachment_name, texture.getFormat());
+    attachments_[attachment_name].texture = texture;
+    return *this;
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,

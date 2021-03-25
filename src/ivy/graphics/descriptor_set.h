@@ -2,7 +2,7 @@
 #define IVY_DESCRIPTOR_SET_H
 
 #include "ivy/types.h"
-#include "ivy/graphics/texture2d.h"
+#include "ivy/graphics/texture.h"
 #include <vulkan/vulkan.h>
 #include <string>
 #include <vector>
@@ -87,8 +87,9 @@ public:
      * \brief Set a 2D texture in the descriptor set
      * \param binding The binding in the set for the texture
      * \param texture The texture
+     * \param sampler The sampler
      */
-    void setTexture(u32 binding, const Texture2D &texture);
+    void setTexture(u32 binding, const Texture &texture, VkSampler sampler);
 
     /**
      * \brief Set a 2D texture in the descriptor set manually

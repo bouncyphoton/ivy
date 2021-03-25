@@ -1,7 +1,6 @@
 #include "renderer.h"
 #include "ivy/log.h"
 #include "ivy/graphics/vertex.h"
-#include "ivy/graphics/texture2d.h"
 #include "ivy/scene/components/transform.h"
 #include "ivy/scene/components/model.h"
 #include "ivy/scene/components/camera.h"
@@ -47,17 +46,28 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
 
     // TODO: shader files should be a part of resource manager
 
+    linearSampler_ = device_.createSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR);
+    nearestSampler_ = device_.createSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST);
+
     // Find best format for depth
     VkFormat depthFormat = device_.getFirstSupportedFormat({
         VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
         VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D16_UNORM_S8_UINT},
     VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-    // Shadow map pass
+    // Create shadow textures that we can also render into
+    directionalLightShadowAtlas_ = gfx::TextureBuilder(device_)
+                                   .setExtent2D(shadowMapSizeDirectional_, shadowMapSizeDirectional_)
+                                   .setFormat(depthFormat)
+                                   .setImageAspect(VK_IMAGE_ASPECT_DEPTH_BIT)
+                                   .setAdditionalUsage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                                   .build();
+
+    // Directional light shadow map pass
     passes_.emplace_back(
         gfx::GraphicsPassBuilder(device_)
-        .setExtent(shadowMapSize_, shadowMapSize_)
-        .addAttachment("depth", depthFormat, VK_IMAGE_USAGE_SAMPLED_BIT)
+        .setExtent(shadowMapSizeDirectional_, shadowMapSizeDirectional_)
+        .addAttachment("depth", *directionalLightShadowAtlas_)
         .addSubpass("shadow_pass",
                     gfx::SubpassBuilder()
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/shadow.vert.spv")
@@ -71,11 +81,6 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                    )
         .build()
     );
-
-    // Create a sampler for our shadow map
-    shadowSampler_ = device_.createSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
 
     // Main gbuffer and shading pass
     passes_.emplace_back(
@@ -132,7 +137,7 @@ Renderer::~Renderer() {
 void Renderer::render(Scene &scene, DebugMode debug_mode) {
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
-    gfx::GraphicsPass &shadowPass = passes_.at(0);
+    gfx::GraphicsPass &shadowPassDirectional = passes_.at(0);
     gfx::GraphicsPass &lightingPass = passes_.at(1);
 
     // Find camera in entities
@@ -155,7 +160,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
         memoryBarrier.srcAccessMask = 0;
         memoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        memoryBarrier.image = device_.getFramebuffer(shadowPass).getImage("depth");
+        memoryBarrier.image = directionalLightShadowAtlas_->getImage();
         memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         memoryBarrier.subresourceRange.levelCount = 1;
         memoryBarrier.subresourceRange.layerCount = 1;
@@ -167,22 +172,22 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
     }
 
     // Shadow pass
-    cmd.executeGraphicsPass(device_, shadowPass, [&]() {
-        cmd.bindGraphicsPipeline(shadowPass, 0);
+    cmd.executeGraphicsPass(device_, shadowPassDirectional, [&]() {
+        cmd.bindGraphicsPipeline(shadowPassDirectional, 0);
 
         std::vector<EntityHandle> lightEntities = scene.findEntitiesWithAnyComponents<DirectionalLight>();
 
         // Count number of shadow casting lights
-        numShadows = 0;
+        numShadowsDirectional_ = 0;
         for (auto &lightEntity : lightEntities) {
             DirectionalLight *dirLight = lightEntity->getComponent<DirectionalLight>();
             if (dirLight && dirLight->castsShadows()) {
-                ++numShadows;
+                ++numShadowsDirectional_;
             }
         }
 
-        shadowsPerSide = (u32) std::ceil(std::sqrt(numShadows));
-        shadowSize = (u32) shadowMapSize_ / shadowsPerSide;
+        shadowsPerSideDirectional_ = (u32) std::ceil(std::sqrt(numShadowsDirectional_));
+        shadowSizeDirectional_ = (u32) shadowMapSizeDirectional_ / shadowsPerSideDirectional_;
         u32 shadowIdx = 0;
 
         // Render shadow maps
@@ -201,9 +206,9 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
             perLight.viewProjection = dirLight->calculateViewProjectionMatrix(cameraTransform, camera);
 
             // Send to shader
-            gfx::DescriptorSet perLightSet(shadowPass, 0, 0);
+            gfx::DescriptorSet perLightSet(shadowPassDirectional, 0, 0);
             perLightSet.setUniformBuffer(0, perLight);
-            cmd.setDescriptorSet(device_, shadowPass, perLightSet);
+            cmd.setDescriptorSet(device_, shadowPassDirectional, perLightSet);
 
             // Go over entities and draw
             for (EntityHandle &entity : scene.findEntitiesWithAllComponents<Transform, Model>()) {
@@ -216,9 +221,9 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                 // Iterate over meshes in model
                 for (const gfx::Mesh &mesh : model->getMeshes()) {
                     // Send to shader
-                    gfx::DescriptorSet perMeshSet(shadowPass, 0, 1);
+                    gfx::DescriptorSet perMeshSet(shadowPassDirectional, 0, 1);
                     perMeshSet.setUniformBuffer(0, perMesh);
-                    cmd.setDescriptorSet(device_, shadowPass, perMeshSet);
+                    cmd.setDescriptorSet(device_, shadowPassDirectional, perMeshSet);
 
                     // Draw this mesh
                     mesh.getGeometry().draw(cmd);
@@ -237,7 +242,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
         memoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         memoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        memoryBarrier.image = device_.getFramebuffer(shadowPass).getImage("depth");
+        memoryBarrier.image = directionalLightShadowAtlas_->getImage();
         memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         memoryBarrier.subresourceRange.levelCount = 1;
         memoryBarrier.subresourceRange.layerCount = 1;
@@ -286,7 +291,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                     // Material data
                     const gfx::Material &mat = mesh.getMaterial();
                     gfx::DescriptorSet materialSet(lightingPass, subpassIdx, 1);
-                    materialSet.setTexture(0, mat.getDiffuseTexture());
+                    materialSet.setTexture(0, mat.getDiffuseTexture(), linearSampler_);
                     cmd.setDescriptorSet(device_, lightingPass, materialSet);
 
                     // Draw this mesh
@@ -322,7 +327,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
 
                 gfx::DescriptorSet perFrameSet(lightingPass, subpassIdx, 1);
                 perFrameSet.setUniformBuffer(0, perFrame);
-                perFrameSet.setTexture(1, device_.getFramebuffer(shadowPass).getView("depth"), shadowSampler_);
+                perFrameSet.setTexture(1, *directionalLightShadowAtlas_, nearestSampler_);
                 cmd.setDescriptorSet(device_, lightingPass, perFrameSet);
             }
 
@@ -331,22 +336,29 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
             for (auto &lightEntity : scene.findEntitiesWithAnyComponents<DirectionalLight>()) {
                 DirectionalLight *dirLight = lightEntity->getComponent<DirectionalLight>();
 
+                PerLightLightingPass perLight = {};
+
                 if (dirLight) {
-                    PerLightLightingPass perLight = {};
                     perLight.viewProjection = dirLight->calculateViewProjectionMatrix(cameraTransform, camera);
                     perLight.directionAndShadowBias = glm::vec4(dirLight->getDirection(), dirLight->getShadowBias());
                     perLight.colorAndIntensity = glm::vec4(dirLight->getColor(), dirLight->getIntensity());
                     if (dirLight->castsShadows()) {
-                        perLight.shadowViewportNormalized = getShadowViewport(shadowIdx) / (f32) shadowMapSize_;
+                        perLight.shadowViewportNormalized = getShadowViewport(shadowIdx) / (f32) shadowMapSizeDirectional_;
                         ++shadowIdx;
                     }
+                }
 
-                    gfx::DescriptorSet perLightSet(lightingPass, subpassIdx, 2);
-                    perLightSet.setUniformBuffer(0, perLight);
-                    cmd.setDescriptorSet(device_, lightingPass, perLightSet);
+                gfx::DescriptorSet perLightSet(lightingPass, subpassIdx, 2);
+                perLightSet.setUniformBuffer(0, perLight);
+                cmd.setDescriptorSet(device_, lightingPass, perLightSet);
 
-                    // Draw our fullscreen triangle
-                    cmd.draw(3, 1, 0, 0);
+                // Draw our fullscreen triangle
+                cmd.draw(3, 1, 0, 0);
+
+                // If we're using a debug mode, only draw once
+                // Otherwise, we additively blend debug rendering for each light
+                if (debug_mode != DebugMode::FULL) {
+                    break;
                 }
             }
         }
@@ -357,9 +369,9 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
 
 glm::vec4 Renderer::getShadowViewport(ivy::u32 shadow_idx) const {
     return glm::vec4(
-               (shadow_idx % shadowsPerSide) * shadowSize,
-               (shadow_idx / shadowsPerSide) * shadowSize,
-               shadowSize,
-               shadowSize
+               (shadow_idx % shadowsPerSideDirectional_) * shadowSizeDirectional_,
+               (shadow_idx / shadowsPerSideDirectional_) * shadowSizeDirectional_,
+               shadowSizeDirectional_,
+               shadowSizeDirectional_
            );
 }

@@ -142,7 +142,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         aiMaterial *aiMat = scene->mMaterials[mesh->mMaterialIndex];
 
         // Diffuse
-        const gfx::Texture2D *diffuseTexture = textureWhite_;
+        const gfx::Texture *diffuseTexture = textureWhite_;
         if (aiMat->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
             aiString diffusePath;
             aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &diffusePath);
@@ -183,7 +183,13 @@ bool ResourceManager::loadTextureFromFile(const std::string &texture_path) {
 }
 
 void ResourceManager::loadTexture(const std::string &name, u32 width, u32 height, VkFormat format, u8 *data, u32 size) {
-    textures_.emplace(name, std::make_unique<gfx::Texture2D>(device_, width, height, format, data, size));
+    textures_.emplace(name, std::make_unique<gfx::Texture>(
+                          gfx::TextureBuilder(device_)
+                          .setExtent2D(width, height)
+                          .setFormat(format)
+                          .setImageAspect(VK_IMAGE_ASPECT_COLOR_BIT)
+                          .setData(data, size)
+                          .build()));
 }
 
 }

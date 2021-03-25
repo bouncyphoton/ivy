@@ -3,22 +3,22 @@
 
 namespace ivy::gfx {
 
-class Texture2D;
+class Texture;
 
 /**
  * \brief Describes a surface
  */
 class Material {
 public:
-    explicit Material(const Texture2D &diffuse_texture)
+    explicit Material(const Texture &diffuse_texture)
         : diffuseTexture_(diffuse_texture) {}
 
-    [[nodiscard]] const Texture2D &getDiffuseTexture() const {
+    [[nodiscard]] const Texture &getDiffuseTexture() const {
         return diffuseTexture_;
     }
 
 private:
-    const Texture2D &diffuseTexture_;
+    const Texture &diffuseTexture_;
 };
 
 }

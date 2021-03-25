@@ -45,7 +45,7 @@ public:
                     VkDeviceSize src_offset = 0);
 
     void copyBufferToImage(VkBuffer src, VkImage dst, VkImageLayout dst_layout, VkImageAspectFlags image_aspect,
-                           u32 width, u32 height, u32 depth = 1);
+                           u32 width, u32 height, u32 depth, u32 layers);
 
     void pipelineBarrier(VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage, VkDependencyFlags dependency,
                          u32 num_memory_barriers, const VkMemoryBarrier *memory_barriers,

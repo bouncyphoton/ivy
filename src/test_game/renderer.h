@@ -6,6 +6,7 @@
 #include "ivy/graphics/graphics_pass.h"
 #include "ivy/graphics/vertex.h"
 #include "ivy/graphics/geometry.h"
+#include "ivy/graphics/texture.h"
 #include "ivy/scene/scene.h"
 
 /**
@@ -34,11 +35,14 @@ private:
     ivy::gfx::RenderDevice &device_;
     std::vector<ivy::gfx::GraphicsPass> passes_;
 
-    const ivy::u32 shadowMapSize_ = 2048;
-    ivy::u32 numShadows = 0;
-    ivy::u32 shadowsPerSide = 0;
-    ivy::u32 shadowSize = 0;
-    VkSampler shadowSampler_;
+    const ivy::u32 shadowMapSizeDirectional_ = 2048;
+    ivy::u32 numShadowsDirectional_ = 0;
+    ivy::u32 shadowsPerSideDirectional_ = 0;
+    ivy::u32 shadowSizeDirectional_ = 0;
+    VkSampler nearestSampler_;
+    VkSampler linearSampler_;
+
+    std::optional<ivy::gfx::Texture> directionalLightShadowAtlas_;
 };
 
 #endif // IVY_RENDERER_H

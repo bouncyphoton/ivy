@@ -2,11 +2,11 @@
 #define IVY_TEXTURE_RESOURCE_H
 
 #include "ivy/resources/resource.h"
-#include "ivy/graphics/texture2d.h"
+#include "ivy/graphics/texture.h"
 
 namespace ivy {
 
-using TextureResource = Resource<gfx::Texture2D>;
+using TextureResource = Resource<gfx::Texture>;
 
 }
 

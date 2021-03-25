@@ -3,6 +3,7 @@
 
 #include "ivy/types.h"
 #include "ivy/graphics/shader.h"
+#include "ivy/graphics/texture.h"
 #include "ivy/graphics/vertex_description.h"
 #include "ivy/graphics/descriptor_set.h"
 #include <vulkan/vulkan.h>
@@ -14,6 +15,7 @@
 namespace ivy::gfx {
 
 class RenderDevice;
+class Texture;
 
 // TODO: push constants
 
@@ -99,6 +101,11 @@ private:
 struct AttachmentInfo {
     VkAttachmentDescription description;
     VkImageUsageFlags usage;
+
+    // TODO: remove attachment info and only use textures
+
+    // If a texture is the attachment, it's stored here
+    std::optional<Texture> texture;
 };
 
 /**
@@ -326,6 +333,14 @@ private:
 class GraphicsPassBuilder {
 public:
     explicit GraphicsPassBuilder(RenderDevice &device);
+
+    /**
+     * \brief Add a texture to the graphics pass as an attachment
+     * \param attachment_name The name of the attachment
+     * \param texture The texture to attach
+     * \return GraphicsPassBuilder
+     */
+    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, const gfx::Texture &texture);
 
     /**
      * \brief Add an attachment to the graphics pass. Load and store ops as well as final layout are deduced from format

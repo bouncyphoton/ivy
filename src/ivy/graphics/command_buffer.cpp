@@ -126,10 +126,10 @@ void CommandBuffer::copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, Vk
 }
 
 void CommandBuffer::copyBufferToImage(VkBuffer src, VkImage dst, VkImageLayout dst_layout,
-                                      VkImageAspectFlags image_aspect, u32 width, u32 height, u32 depth) {
+                                      VkImageAspectFlags image_aspect, u32 width, u32 height, u32 depth, u32 layers) {
     VkBufferImageCopy region = {};
     region.imageSubresource.aspectMask = image_aspect;
-    region.imageSubresource.layerCount = 1;
+    region.imageSubresource.layerCount = layers;
     region.imageExtent = {width, height, depth};
 
     vkCmdCopyBufferToImage(commandBuffer_, src, dst, dst_layout, 1, &region);

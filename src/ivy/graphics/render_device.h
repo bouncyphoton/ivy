@@ -138,15 +138,15 @@ public:
 
     /**
      * \brief Create an image on the GPU using given image data with the lifetime of the render device
-     * \param width Width of the image
-     * \param height Height of the image
-     * \param format Format of the image
+     * \param image_ci Image create info
+     * \param image_view_ci Image view create info
      * \param data Pixel data
      * \param size Size of pixel data in bytes
      * \return VkImage and VkImageView pair
      */
-    std::pair<VkImage, VkImageView> createTextureGPUFromData(u32 width, u32 height, VkFormat format, const void *data,
-                                                             VkDeviceSize size);
+    std::pair<VkImage, VkImageView> createTextureGPUFromData(VkImageCreateInfo image_ci,
+                                                             VkImageViewCreateInfo image_view_ci,
+                                                             const void *data, VkDeviceSize size);
 
     /**
      * \brief Create a sampler
@@ -246,7 +246,7 @@ private:
 
     std::vector<VkDescriptorPool> pools_;
     std::vector<DescriptorSetCache> descriptorSetCaches_;
-    u32 maxSets_ = 256;
+    u32 maxSets_ = 2048;
 
     std::vector<VkBuffer> uniformBuffers_;
     std::vector<VkDeviceSize> uniformBufferOffsets_;
