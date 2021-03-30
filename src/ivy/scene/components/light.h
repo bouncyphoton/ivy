@@ -10,6 +10,11 @@ namespace ivy {
 
 // TODO: more light types
 
+enum LightType {
+    DIRECTIONAL,
+    POINT
+};
+
 /**
  * \brief Entity component with data for a directional light source
  */
@@ -79,6 +84,76 @@ private:
     f32 intensity_;
     bool castsShadows_;
     f32 shadowBias_;
+};
+
+// TODO: there is a lot of shared functionality, maybe create a light base class?
+
+class PointLight : public Component {
+public:
+    explicit PointLight(glm::vec3 color = glm::vec3(1), f32 intensity = 1.0f,
+                        bool casts_shadows = true, f32 shadow_bias = 0.005f, f32 near_plane = 0.01f, f32 far_plane = 10.0f)
+        : color_(color), intensity_(intensity), castsShadows_(casts_shadows), shadowBias_(shadow_bias),
+          nearPlane_(near_plane), farPlane_(far_plane) {}
+
+    [[nodiscard]] std::string getName() const override {
+        return "PointLight";
+    }
+
+    [[nodiscard]] glm::vec3 getColor() const {
+        return color_;
+    }
+
+    void setColor(glm::vec3 color) {
+        color_ = color;
+    }
+
+    [[nodiscard]] f32 getIntensity() const {
+        return intensity_;
+    }
+
+    void setIntensity(f32 intensity) {
+        intensity_ = intensity;
+    }
+
+    [[nodiscard]] bool castsShadows() const {
+        return castsShadows_;
+    }
+
+    void setShadowCasting(bool casts_shadows) {
+        castsShadows_ = casts_shadows;
+    }
+
+    [[nodiscard]] f32 getShadowBias() const {
+        return shadowBias_;
+    }
+
+    void setShadowBias(float bias) {
+        shadowBias_ = bias;
+    }
+
+    [[nodiscard]] f32 getNearPlane() const {
+        return nearPlane_;
+    }
+
+    void setNearPlane(f32 near_plane) {
+        nearPlane_ = near_plane;
+    }
+
+    [[nodiscard]] f32 getFarPlane() const {
+        return farPlane_;
+    }
+
+    void setFarPlane(f32 far_plane) {
+        farPlane_ = far_plane;
+    }
+
+private:
+    glm::vec3 color_;
+    f32 intensity_;
+    bool castsShadows_;
+    f32 shadowBias_;
+    f32 nearPlane_;
+    f32 farPlane_;
 };
 
 }

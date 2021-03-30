@@ -11,8 +11,15 @@
 
 using namespace ivy;
 
-struct PerLightShadowPass {
+struct PerLightDirectionalShadowPass {
     alignas(16) glm::mat4 viewProjection;
+};
+
+struct PerLightPointShadowPass {
+    alignas(16) glm::mat4 viewProjectionMatrices[6];
+    alignas(16) glm::vec3 lightPosition;
+    alignas(8) glm::vec2 nearAndFarPlanes;
+    alignas(4) u32 lightIndex;
 };
 
 struct PerMeshShadowPass {
@@ -35,9 +42,13 @@ struct PerFrameLightingPass {
 
 struct PerLightLightingPass {
     alignas(16) glm::mat4 viewProjection;
-    alignas(16) glm::vec4 directionAndShadowBias; // xyz = direction, w = shadow bias
+    alignas(16) glm::vec4 directionAndShadowBias; // xyz = direction/position, w = shadow bias
     alignas(16) glm::vec4 colorAndIntensity;      // xyz = color, w = intensity
-    alignas(16) glm::vec4 shadowViewportNormalized;
+    alignas(16) glm::vec4 shadowViewportNormalized; // shadowViewportNormalized or (near, far, 0, 0)
+
+    // these could be packed into one
+    alignas(4) u32 lightType;
+    alignas(4) u32 shadowIndex;
 };
 
 Renderer::Renderer(gfx::RenderDevice &render_device)
@@ -55,13 +66,22 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
         VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D16_UNORM_S8_UINT},
     VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-    // Create shadow textures that we can also render into
+    // Create directional shadow texture that we can render into
     directionalLightShadowAtlas_ = gfx::TextureBuilder(device_)
                                    .setExtent2D(shadowMapSizeDirectional_, shadowMapSizeDirectional_)
                                    .setFormat(depthFormat)
                                    .setImageAspect(VK_IMAGE_ASPECT_DEPTH_BIT)
                                    .setAdditionalUsage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                                    .build();
+
+    // Create point shadow cubemap textures
+    pointLightShadowAtlas_ = gfx::TextureBuilder(device_)
+                             .setExtentCubemap(shadowMapSizePoint_)
+                             .setFormat(depthFormat)
+                             .setImageAspect(VK_IMAGE_ASPECT_DEPTH_BIT)
+                             .setAdditionalUsage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                             .setArrayLength(maxShadowCastingPointLights_)
+                             .build();
 
     // Directional light shadow map pass
     passes_.emplace_back(
@@ -70,11 +90,31 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
         .addAttachment("depth", *directionalLightShadowAtlas_)
         .addSubpass("shadow_pass",
                     gfx::SubpassBuilder()
-                    .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/shadow.vert.spv")
+                    .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/shadow_directional.vert.spv")
                     // trivial fragment shader
                     .addVertexDescription(gfx::VertexP3N3UV2::getBindingDescriptions(),
                                           gfx::VertexP3N3UV2::getAttributeDescriptions())
                     .addUniformBufferDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
+                    .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_VERTEX_BIT)
+                    .addDepthAttachment("depth")
+                    .build()
+                   )
+        .build()
+    );
+
+    // Point light shadow map pass
+    passes_.emplace_back(
+        gfx::GraphicsPassBuilder(device_)
+        .setExtent(shadowMapSizePoint_, shadowMapSizePoint_)
+        .addAttachment("depth", *pointLightShadowAtlas_)
+        .addSubpass("shadow_pass",
+                    gfx::SubpassBuilder()
+                    .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/shadow_point.vert.spv")
+                    .addShader(gfx::Shader::StageEnum::GEOMETRY, "../assets/shaders/shadow_point.geom.spv")
+                    .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/shadow_point.frag.spv")
+                    .addVertexDescription(gfx::VertexP3N3UV2::getBindingDescriptions(),
+                                          gfx::VertexP3N3UV2::getAttributeDescriptions())
+                    .addUniformBufferDescriptor(0, 0, VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_VERTEX_BIT)
                     .addDepthAttachment("depth")
                     .build()
@@ -113,6 +153,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addInputAttachmentDescriptor(0, 2, "depth")
                     .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addTextureDescriptor(1, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .addTextureDescriptor(1, 2, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addUniformBufferDescriptor(2, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build()
                    )
@@ -138,7 +179,8 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
     gfx::GraphicsPass &shadowPassDirectional = passes_.at(0);
-    gfx::GraphicsPass &lightingPass = passes_.at(1);
+    gfx::GraphicsPass &shadowPassPoint = passes_.at(1);
+    gfx::GraphicsPass &lightingPass = passes_.at(2);
 
     // Find camera in entities
     EntityHandle cameraEntity = scene.findEntityWithAllComponents<Camera, Transform>();
@@ -151,7 +193,119 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
         cameraTransform = *cameraEntity->getComponent<Transform>();
     }
 
-    // Transition shadow map back from previous frame for writing
+    // Transition point shadow map back from previous frame for writing
+    {
+        VkImageMemoryBarrier memoryBarrier = {};
+        memoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        memoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        memoryBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        memoryBarrier.srcAccessMask = 0;
+        memoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        memoryBarrier.image = pointLightShadowAtlas_->getImage();
+        memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        memoryBarrier.subresourceRange.levelCount = 1;
+        memoryBarrier.subresourceRange.layerCount = pointLightShadowAtlas_->getLayers();
+
+        cmd.pipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                            0, 0, nullptr, 0, nullptr,
+                            1, &memoryBarrier);
+    }
+
+    // Point light shadow pass
+    cmd.executeGraphicsPass(device_, shadowPassPoint, [&]() {
+        cmd.bindGraphicsPipeline(shadowPassPoint, 0);
+        cmd.setViewport(0, 0, shadowMapSizePoint_, shadowMapSizePoint_);
+
+        std::vector<EntityHandle> lightEntities = scene.findEntitiesWithAllComponents<Transform, PointLight>();
+        std::vector<EntityHandle> shadowCasters = scene.findEntitiesWithAllComponents<Transform, Model>();
+
+        // TODO: sort by distance from camera
+
+        // Render shadow maps
+        numShadowsPoint_ = 0;
+        for (auto &lightEntity : lightEntities) {
+            if (numShadowsPoint_ >= maxShadowCastingPointLights_) {
+                break;
+            }
+
+            Transform *lightTransform = lightEntity->getComponent<Transform>();
+            PointLight *light = lightEntity->getComponent<PointLight>();
+            if (!light->castsShadows()) {
+                continue;
+            }
+
+            // View projection matrices
+            glm::vec3 p = lightTransform->getPosition();
+            glm::mat4 vpMatrices[6] = {
+                glm::lookAt(p, p + glm::vec3( 1,  0,  0), glm::vec3(0, -1, 0)),
+                glm::lookAt(p, p + glm::vec3(-1,  0,  0), glm::vec3(0, -1, 0)),
+                glm::lookAt(p, p + glm::vec3( 0,  1,  0), glm::vec3(0, 0, 1)),
+                glm::lookAt(p, p + glm::vec3( 0, -1,  0), glm::vec3(0, 0, -1)),
+                glm::lookAt(p, p + glm::vec3( 0,  0,  1), glm::vec3(0, -1, 0)),
+                glm::lookAt(p, p + glm::vec3( 0,  0, -1), glm::vec3(0, -1, 0)),
+            };
+
+            glm::mat4 projection = glm::perspective(glm::half_pi<f32>(), 1.0f, light->getNearPlane(), light->getFarPlane());
+
+            // Send view projection matrix for face to shader
+            PerLightPointShadowPass perLight = {};
+            for (u32 i = 0; i < COUNTOF(vpMatrices); ++i) {
+                perLight.viewProjectionMatrices[i] = projection * vpMatrices[i];
+            }
+            perLight.lightPosition = p;
+            perLight.nearAndFarPlanes = glm::vec2(light->getNearPlane(), light->getFarPlane());
+            perLight.lightIndex = numShadowsPoint_;
+
+            gfx::DescriptorSet perLightSet(shadowPassPoint, 0, 0);
+            perLightSet.setUniformBuffer(0, perLight);
+            cmd.setDescriptorSet(device_, shadowPassPoint, perLightSet);
+
+            // Render into shadow map
+            // TODO: set a max range
+            for (auto &caster : shadowCasters) {
+                Transform *transform = caster->getComponent<Transform>();
+                Model *model = caster->getComponent<Model>();
+
+                PerMeshShadowPass perMesh = {};
+                perMesh.model = transform->getModelMatrix();
+
+                // Iterate over meshes in model
+                for (const gfx::Mesh &mesh : model->getMeshes()) {
+                    // Send to shader
+                    gfx::DescriptorSet perMeshSet(shadowPassPoint, 0, 1);
+                    perMeshSet.setUniformBuffer(0, perMesh);
+                    cmd.setDescriptorSet(device_, shadowPassPoint, perMeshSet);
+
+                    // Draw this mesh
+                    mesh.getGeometry().draw(cmd);
+                }
+            }
+
+            ++numShadowsPoint_;
+        }
+    });
+
+    // Transition point shadow map for reading
+    {
+        VkImageMemoryBarrier memoryBarrier = {};
+        memoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        memoryBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        memoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        memoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        memoryBarrier.image = pointLightShadowAtlas_->getImage();
+        memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        memoryBarrier.subresourceRange.levelCount = 1;
+        memoryBarrier.subresourceRange.layerCount = pointLightShadowAtlas_->getLayers();
+
+        cmd.pipelineBarrier(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                            1, &memoryBarrier);
+    }
+
+    // Transition directional shadow map back from previous frame for writing
     {
         VkImageMemoryBarrier memoryBarrier = {};
         memoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -171,7 +325,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                             1, &memoryBarrier);
     }
 
-    // Shadow pass
+    // Directional light shadow pass
     cmd.executeGraphicsPass(device_, shadowPassDirectional, [&]() {
         cmd.bindGraphicsPipeline(shadowPassDirectional, 0);
 
@@ -180,10 +334,15 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
         // Count number of shadow casting lights
         numShadowsDirectional_ = 0;
         for (auto &lightEntity : lightEntities) {
-            DirectionalLight *dirLight = lightEntity->getComponent<DirectionalLight>();
-            if (dirLight && dirLight->castsShadows()) {
+            DirectionalLight *light = lightEntity->getComponent<DirectionalLight>();
+            if (light && light->castsShadows()) {
                 ++numShadowsDirectional_;
             }
+        }
+
+        // No directional lights, return
+        if (numShadowsDirectional_ == 0) {
+            return;
         }
 
         shadowsPerSideDirectional_ = (u32) std::ceil(std::sqrt(numShadowsDirectional_));
@@ -192,8 +351,8 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
 
         // Render shadow maps
         for (auto &lightEntity : lightEntities) {
-            DirectionalLight *dirLight = lightEntity->getComponent<DirectionalLight>();
-            if (dirLight && !dirLight->castsShadows()) {
+            DirectionalLight *light = lightEntity->getComponent<DirectionalLight>();
+            if (light && !light->castsShadows()) {
                 continue;
             }
 
@@ -202,8 +361,8 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
             cmd.setViewport(viewport.x, viewport.y, viewport.z, viewport.w);
 
             // Light data
-            PerLightShadowPass perLight = {};
-            perLight.viewProjection = dirLight->calculateViewProjectionMatrix(cameraTransform, camera);
+            PerLightDirectionalShadowPass perLight = {};
+            perLight.viewProjection = light->calculateViewProjectionMatrix(cameraTransform, camera);
 
             // Send to shader
             gfx::DescriptorSet perLightSet(shadowPassDirectional, 0, 0);
@@ -234,7 +393,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
         }
     });
 
-    // Transition shadow map for reading
+    // Transition directional shadow map for reading
     {
         VkImageMemoryBarrier memoryBarrier = {};
         memoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -328,13 +487,19 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                 gfx::DescriptorSet perFrameSet(lightingPass, subpassIdx, 1);
                 perFrameSet.setUniformBuffer(0, perFrame);
                 perFrameSet.setTexture(1, *directionalLightShadowAtlas_, nearestSampler_);
+                perFrameSet.setTexture(2, *pointLightShadowAtlas_, nearestSampler_);
                 cmd.setDescriptorSet(device_, lightingPass, perFrameSet);
             }
 
+            // TODO: this depends on the order of lights being the same
+
             // Draw lights
-            u32 shadowIdx = 0;
-            for (auto &lightEntity : scene.findEntitiesWithAnyComponents<DirectionalLight>()) {
-                DirectionalLight *dirLight = lightEntity->getComponent<DirectionalLight>();
+            u32 dirShadowIdx = 0;
+            u32 pntShadowIdx = 0;
+            for (auto &lightEntity : scene.findEntitiesWithAnyComponents<DirectionalLight, PointLight>()) {
+                DirectionalLight *dirLight  = lightEntity->getComponent<DirectionalLight>();
+                PointLight       *pntLight  = lightEntity->getComponent<PointLight>();
+                Transform        *transform = lightEntity->getComponent<Transform>();
 
                 PerLightLightingPass perLight = {};
 
@@ -342,10 +507,29 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                     perLight.viewProjection = dirLight->calculateViewProjectionMatrix(cameraTransform, camera);
                     perLight.directionAndShadowBias = glm::vec4(dirLight->getDirection(), dirLight->getShadowBias());
                     perLight.colorAndIntensity = glm::vec4(dirLight->getColor(), dirLight->getIntensity());
+                    perLight.lightType = LightType::DIRECTIONAL;
                     if (dirLight->castsShadows()) {
-                        perLight.shadowViewportNormalized = getShadowViewport(shadowIdx) / (f32) shadowMapSizeDirectional_;
-                        ++shadowIdx;
+                        perLight.shadowViewportNormalized = getShadowViewport(dirShadowIdx) / (f32) shadowMapSizeDirectional_;
+                        perLight.shadowIndex = dirShadowIdx;
+                        ++dirShadowIdx;
+                    } else {
+                        perLight.shadowIndex = -1;
                     }
+                } else if (pntLight && transform) {
+                    // TODO: better names for variables that are shared/interpreted differently depending on light type
+
+                    perLight.directionAndShadowBias = glm::vec4(transform->getPosition(), pntLight->getShadowBias());
+                    perLight.colorAndIntensity = glm::vec4(pntLight->getColor(), pntLight->getIntensity());
+                    perLight.shadowViewportNormalized = glm::vec4(pntLight->getNearPlane(), pntLight->getFarPlane(), 0, 0);
+                    perLight.lightType = LightType::POINT;
+                    if (pntLight->castsShadows() && pntShadowIdx < maxShadowCastingPointLights_) {
+                        perLight.shadowIndex = pntShadowIdx;
+                        ++pntShadowIdx;
+                    } else {
+                        perLight.shadowIndex = -1;
+                    }
+                } else {
+                    continue;
                 }
 
                 gfx::DescriptorSet perLightSet(lightingPass, subpassIdx, 2);

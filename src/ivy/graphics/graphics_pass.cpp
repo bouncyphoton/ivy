@@ -29,6 +29,7 @@ GraphicsPass GraphicsPassBuilder::build() {
     // A set of unreferenced attachments for validation
     std::unordered_set<std::string> unreferencedAttachments;
 
+    u32 numLayers = 0;
     for (const auto &attachmentPair : attachments_) {
         const std::string &name = attachmentPair.first;
         const AttachmentInfo &info = attachmentPair.second;
@@ -37,6 +38,22 @@ GraphicsPass GraphicsPassBuilder::build() {
         attachmentLocations[name] = attachmentDescriptions.size();
         attachmentDescriptions.emplace_back(info.description);
         unreferencedAttachments.emplace(name);
+
+        // Validate that all attachments have the same number of layers
+        u32 currentLayers = attachmentPair.second.texture ? attachmentPair.second.texture->getLayers() : 1;
+        if (currentLayers != numLayers) {
+            if (numLayers == 0) {
+                numLayers = currentLayers;
+            } else {
+                Log::fatal("Graphics pass contains attachments with different numbers of layers: "
+                           "Attachment '%' has % layers which is different from %", name, currentLayers, numLayers);
+            }
+        }
+    }
+
+    // No custom attachments which means all attachments have 1 layer
+    if (numLayers == 0) {
+        numLayers = 1;
     }
 
     //--------------------------------------
@@ -271,7 +288,7 @@ GraphicsPass GraphicsPassBuilder::build() {
     }
 
     // Create the graphics pass
-    return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts, extent_);
+    return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts, extent_, numLayers);
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name,

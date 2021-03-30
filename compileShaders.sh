@@ -18,7 +18,7 @@ mkdir -p ./assets/shaders
 cd src/ivy/graphics/shaders
 
 # Compile shaders in current directory
-for filename in *.{vert,frag,comp}; do
+for filename in *.{vert,frag,geom,comp}; do
     # Make sure the file exists
     [ -e $filename ] || continue
 

@@ -103,10 +103,17 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
         queueCreateInfos.emplace_back(queueCreateInfo);
     }
 
+    // Enable features
+    VkPhysicalDeviceFeatures features;
+    vkGetPhysicalDeviceFeatures(physicalDevice_, &features);
+    features.imageCubeArray = VK_TRUE;
+    features.geometryShader = VK_TRUE;
+
     VkDeviceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.queueCreateInfoCount = (u32)queueCreateInfos.size();
+    createInfo.pEnabledFeatures = &features;
 
     std::vector<const char *> deviceExtensions = getDeviceExtensions();
     createInfo.enabledExtensionCount = (u32)deviceExtensions.size();
@@ -650,8 +657,6 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                 } else {
                     // Need to create image & imageview for this attachment
 
-                    // TODO: support non-2D attachments (imageCI.imageType, imageCI.extent, imageViewCI.viewType) ?
-
                     VkImageCreateInfo imageCI = {};
                     imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
                     imageCI.imageType = VK_IMAGE_TYPE_2D;
@@ -714,7 +719,7 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
             framebufferCreateInfo.pAttachments = viewsVector.data();
             framebufferCreateInfo.width = pass.getExtent().width;
             framebufferCreateInfo.height = pass.getExtent().height;
-            framebufferCreateInfo.layers = 1;
+            framebufferCreateInfo.layers = pass.getNumLayers();
 
             VkFramebuffer framebuffer;
             VK_CHECKF(vkCreateFramebuffer(device_, &framebufferCreateInfo, nullptr, &framebuffer));
@@ -898,7 +903,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
     //----------------------------------
 
     std::vector<VkDescriptorImageInfo> imageInfos;
-    imageInfos.reserve(set.getInputAttachmentInfos().size());
+    imageInfos.reserve(set.getInputAttachmentInfos().size() + set.getCombinedImageSamplerInfos().size());
 
     for (const InputAttachmentDescriptorInfo &desc : set.getInputAttachmentInfos()) {
         VkDescriptorImageInfo imageInfo = {};
@@ -983,7 +988,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         write.dstBinding = info.binding;
         write.descriptorCount = 1;
         write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        write.pImageInfo = &imageInfos.back();;
+        write.pImageInfo = &imageInfos.back();
 
         writes.emplace_back(write);
     }

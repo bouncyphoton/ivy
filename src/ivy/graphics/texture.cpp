@@ -1,5 +1,6 @@
 #include "texture.h"
 #include "ivy/graphics/render_device.h"
+#include "ivy/log.h"
 
 namespace ivy::gfx {
 
@@ -33,6 +34,11 @@ TextureBuilder &TextureBuilder::setAdditionalUsage(VkImageUsageFlags additional_
     return *this;
 }
 
+TextureBuilder &TextureBuilder::setArrayLength(u32 length) {
+    arrayLength_ = length;
+    return *this;
+}
+
 TextureBuilder &TextureBuilder::setData(const void *data, VkDeviceSize data_size) {
     data_ = data;
     dataSize_ = data_size;
@@ -40,6 +46,8 @@ TextureBuilder &TextureBuilder::setData(const void *data, VkDeviceSize data_size
 }
 
 Texture TextureBuilder::build() {
+    // TODO: error on invalid settings
+
     VkImageCreateInfo imageCI = {};
     imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageCI.format = format_;
@@ -57,18 +65,22 @@ Texture TextureBuilder::build() {
     viewCI.subresourceRange.aspectMask = imageAspect_;
     viewCI.subresourceRange.levelCount = imageCI.mipLevels;
 
+    if (arrayLength_ < 1) {
+        Log::fatal("Invalid array size: %", arrayLength_);
+    }
+
     switch (type_) {
         case Texture::Type::TEX_CUBEMAP:
-            imageCI.arrayLayers = 6;
+            imageCI.arrayLayers = 6 * arrayLength_;
             imageCI.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-            viewCI.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+            viewCI.viewType = arrayLength_ == 1 ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
             imageCI.imageType = VK_IMAGE_TYPE_2D;
             break;
         case Texture::Type::TEX_2D:
-            imageCI.arrayLayers = 1;
+            imageCI.arrayLayers = arrayLength_;
             imageCI.flags = 0;
+            viewCI.viewType = arrayLength_ == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
             imageCI.imageType = VK_IMAGE_TYPE_2D;
-            viewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
             break;
     }
 

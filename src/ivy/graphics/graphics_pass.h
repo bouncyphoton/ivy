@@ -120,9 +120,10 @@ public:
 
     explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
                           const std::map<std::string, AttachmentInfo> &attachment_infos,
-                          const std::map<u32, std::map<u32, DescriptorSetLayout>> &descriptorSetLayouts, VkExtent2D extent)
+                          const std::map<u32, std::map<u32, DescriptorSetLayout>> &descriptorSetLayouts,
+                          VkExtent2D extent, u32 num_layers)
         : renderPass_(render_pass), subpasses_(subpasses), attachmentInfos_(attachment_infos),
-          descriptorSetLayouts_(descriptorSetLayouts), passExtent_(extent) {}
+          descriptorSetLayouts_(descriptorSetLayouts), passExtent_(extent), numLayers_(num_layers) {}
 
     /**
      * \brief Get the VkRenderPass for this graphics pass
@@ -167,6 +168,14 @@ public:
         return passExtent_;
     }
 
+    /**
+     * \brief Get the number of layers for the framebuffer
+     * \return Number of layers
+     */
+    [[nodiscard]] u32 getNumLayers() const {
+        return numLayers_;
+    }
+
 private:
     // Friend so that they can access UnusedName
     friend class GraphicsPassBuilder;
@@ -182,6 +191,7 @@ private:
     std::map<std::string, AttachmentInfo> attachmentInfos_;
     std::map<u32, std::map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
     VkExtent2D passExtent_;
+    u32 numLayers_;
 };
 
 /**

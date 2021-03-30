@@ -27,6 +27,10 @@ public:
         return imageCI_.extent;
     }
 
+    [[nodiscard]] u32 getLayers() const {
+        return imageCI_.arrayLayers;
+    }
+
     [[nodiscard]] VkImageViewType getViewType() const {
         return viewCI_.viewType;
     }
@@ -68,6 +72,8 @@ public:
 
     TextureBuilder &setAdditionalUsage(VkImageUsageFlags additional_usage);
 
+    TextureBuilder &setArrayLength(u32 length);
+
     TextureBuilder &setData(const void *data, VkDeviceSize data_size);
 
     template <typename T>
@@ -87,6 +93,7 @@ private:
     VkImageAspectFlags imageAspect_{};
     VkSampler sampler_{};
     VkImageUsageFlags additionalUsage_{};
+    u32 arrayLength_ = 1;
     const void *data_{};
     VkDeviceSize dataSize_{};
 };

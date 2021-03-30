@@ -38,9 +38,21 @@ void TestGame::init() {
     // Add bunnies
     for (i32 i = 0; i < 10; ++i) {
         EntityHandle bunny = scene_.createEntity();
-        bunny->setTag("bunny");
         bunny->setComponent(Transform(glm::vec3((i - 5) * 2, 1, 0)));
+        bunny->setTag("bunny");
         bunny->setComponent(Model(resourceManager.getModel("models/bunny.obj")));
+    }
+
+    // Add lights
+    for (i32 i = 0; i < 16; ++i) {
+        f32 x = (f32) (i - 8) * 2;
+        f32 y = 1 + (i % 3 == 1 ? 3 : 0);
+        f32 z = (f32) ((i % 3) - 1) * 5;
+
+        EntityHandle light = scene_.createEntity();
+        light->setComponent(Transform(glm::vec3(x, y, z)));
+        light->setComponent(PointLight(glm::vec3(rand(), rand(), rand()) / (f32)RAND_MAX, 2));
+        light->setTag("pnt_light");
     }
 
     // Add sponza
@@ -55,22 +67,8 @@ void TestGame::init() {
     {
         EntityHandle camera = scene_.createEntity();
         camera->setTag("camera");
-        camera->setComponent(Transform(glm::vec3(0, 1, 5)));
+        camera->setComponent(Transform(glm::vec3(10, 4, -1.4), glm::vec3(5.7, 2, 0)));
         camera->setComponent<Camera>();
-    }
-
-    // Add red directional light
-    {
-        EntityHandle light = scene_.createEntity();
-        light->setTag("red_light");
-        light->setComponent(DirectionalLight(glm::vec3(-0.1f, -1.0f, 0.1f), glm::vec3(1, 0, 0)));
-    }
-
-    // Add blue directional light
-    {
-        EntityHandle light = scene_.createEntity();
-        light->setTag("blue_light");
-        light->setComponent(DirectionalLight(glm::vec3(-0.1f, -1.0f, -0.1f), glm::vec3(0, 0, 1)));
     }
 }
 
@@ -102,50 +100,39 @@ void TestGame::update() {
         Log::debug("Rendering shadow map");
     }
 
-    // Delete nearest bunny
+    // Delete nearest light
     if (input.isKeyPressed(GLFW_KEY_BACKSPACE)) {
         if (EntityHandle camera = scene_.findEntityWithAllComponents<Transform, Camera>()) {
             Transform ct = *camera->getComponent<Transform>();
 
-            // Find nearest bunny
-            EntityHandle nearestBunny(scene_);
+            // Find nearest light
+            EntityHandle nearestEntity(scene_);
             f32 nearest = 0.0f;
-            for (EntityHandle bunny : scene_.findEntitiesWithTag("bunny")) {
-                Transform bt = *bunny->getComponent<Transform>();
-                f32 dist = glm::distance(bt.getPosition(), ct.getPosition());
-                if (!nearestBunny || dist < nearest) {
+            for (EntityHandle light : scene_.findEntitiesWithAllComponents<Transform, PointLight>()) {
+                Transform lt = *light->getComponent<Transform>();
+                f32 dist = glm::distance(lt.getPosition(), ct.getPosition());
+                if (!nearestEntity || dist < nearest) {
                     nearest = dist;
-                    nearestBunny = bunny;
+                    nearestEntity = light;
                 }
             }
 
-            scene_.deleteEntity(nearestBunny);
+            scene_.deleteEntity(nearestEntity);
         }
     }
 
-    // Spawn bunny at camera location
+    // Spawn light at camera location
     if (input.isKeyPressed(GLFW_KEY_ENTER)) {
         if (EntityHandle camera = scene_.findEntityWithAllComponents<Transform, Camera>()) {
-            EntityHandle bunny = scene_.createEntity();
-            bunny->setTag("bunny");
-            bunny->setComponent(*camera->getComponent<Transform>());
-            bunny->setComponent(Model(engine_.getResourceManager().getModel("models/bunny.obj")));
+            EntityHandle light = scene_.createEntity();
+            light->setComponent(*camera->getComponent<Transform>());
+            light->setComponent(PointLight(glm::vec3(rand(), rand(), rand()) / (f32)RAND_MAX, 2));
         }
     }
 
     // Update entities
     f32 time = (f32) glfwGetTime();
     for (EntityHandle entity : scene_) {
-        // Move lights
-        if (entity->hasTag("red_light")) {
-            DirectionalLight *light = entity->getComponent<DirectionalLight>();
-            light->setDirection(glm::vec3(-0.1f, -1, std::sin(time) * 0.1));
-        }
-        if (entity->hasTag("blue_light")) {
-            DirectionalLight *light = entity->getComponent<DirectionalLight>();
-            light->setDirection(glm::vec3(-0.1f, -1, -std::sin(time) * 0.1));
-        }
-
         Transform *transform = entity->getComponent<Transform>();
         if (!transform) {
             continue;

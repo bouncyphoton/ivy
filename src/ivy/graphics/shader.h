@@ -14,7 +14,8 @@ public:
     enum class StageEnum {
         VERTEX = VK_SHADER_STAGE_VERTEX_BIT,
         FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT,
-        // TODO: geometry and compute
+        GEOMETRY = VK_SHADER_STAGE_GEOMETRY_BIT,
+        // TODO: compute
     };
 
     Shader(StageEnum stage, const std::string &path) : stage_(stage), path_(path) {}

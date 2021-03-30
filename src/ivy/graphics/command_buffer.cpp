@@ -135,6 +135,16 @@ void CommandBuffer::copyBufferToImage(VkBuffer src, VkImage dst, VkImageLayout d
     vkCmdCopyBufferToImage(commandBuffer_, src, dst, dst_layout, 1, &region);
 }
 
+void CommandBuffer::copyImage(VkImage src, VkImageLayout src_layout, VkImage dst, VkImageLayout dst_layout,
+                              u32 num_regions, const VkImageCopy *regions) {
+    vkCmdCopyImage(commandBuffer_, src, src_layout, dst, dst_layout, num_regions, regions);
+}
+
+void CommandBuffer::clearAttachments(u32 num_attachments, const VkClearAttachment *attachments, u32 num_rects,
+                                     const VkClearRect *rects) {
+    vkCmdClearAttachments(commandBuffer_, num_attachments, attachments, num_rects, rects);
+}
+
 void CommandBuffer::pipelineBarrier(VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage,
                                     VkDependencyFlags dependency, u32 num_memory_barriers,
                                     const VkMemoryBarrier *memory_barriers, u32 num_buffer_memory_barriers,

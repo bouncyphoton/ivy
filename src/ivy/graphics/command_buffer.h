@@ -47,6 +47,12 @@ public:
     void copyBufferToImage(VkBuffer src, VkImage dst, VkImageLayout dst_layout, VkImageAspectFlags image_aspect,
                            u32 width, u32 height, u32 depth, u32 layers);
 
+    void copyImage(VkImage src, VkImageLayout src_layout, VkImage dst, VkImageLayout dst_layout, u32 num_regions,
+                   const VkImageCopy *regions);
+
+    void clearAttachments(u32 num_attachments, const VkClearAttachment *attachments, u32 num_rects,
+                          const VkClearRect *rects);
+
     void pipelineBarrier(VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage, VkDependencyFlags dependency,
                          u32 num_memory_barriers, const VkMemoryBarrier *memory_barriers,
                          u32 num_buffer_memory_barriers, const VkBufferMemoryBarrier *buffer_memory_barriers,
