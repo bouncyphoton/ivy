@@ -20,6 +20,13 @@ public:
         indexBuffer_ = device.createIndexBuffer(indices.data(), sizeof(indices[0]) * numIndices_);
     }
 
+    // Create geometry and reuse already existing vertex buffer from another geometry, useful for LODs
+    Geometry(RenderDevice &device, const Geometry &vertex_src, const std::vector<u32> &indices)
+        : numVertices_(vertex_src.numVertices_), numIndices_(indices.size()), vertexBuffer_(vertex_src.vertexBuffer_) {
+        // Create index buffer
+        indexBuffer_ = device.createIndexBuffer(indices.data(), sizeof(indices[0]) * numIndices_);
+    }
+
     void draw(CommandBuffer &cmd) const;
 
 private:

@@ -7,7 +7,7 @@
 
 namespace ivy {
 
-using ModelResource = Resource<std::vector<gfx::Mesh>>;
+using ModelResource = Resource<std::vector<std::vector<gfx::Mesh>>>;
 
 }
 

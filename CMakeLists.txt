@@ -33,6 +33,10 @@ set(ASSIMP_NO_EXPORT on)
 add_subdirectory(external/assimp)
 target_link_libraries(ivy assimp)
 
+# mesh optimizer
+add_subdirectory(external/meshoptimizer)
+target_link_libraries(ivy meshoptimizer)
+
 # stb
 # Include as system to ignore warnings
 include_directories(SYSTEM external/stb)

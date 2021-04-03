@@ -5,6 +5,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include <meshoptimizer.h>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -91,7 +93,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         return false;
     }
 
-    std::vector<gfx::Mesh> meshes;
+    std::vector<std::vector<gfx::Mesh>> lodMeshes(NUM_LOD);
 
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(),
@@ -112,21 +114,24 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         // Process vertices
         vertices.reserve(mesh->mNumVertices);
         for (u32 v = 0; v < mesh->mNumVertices; ++v) {
-            vertices.emplace_back(gfx::VertexP3N3UV2(
-                                      glm::vec3(
-                                          mesh->mVertices[v].x,
-                                          mesh->mVertices[v].y,
-                                          mesh->mVertices[v].z),
-                                      glm::vec3(
-                                          mesh->mNormals[v].x,
-                                          mesh->mNormals[v].y,
-                                          mesh->mNormals[v].z
-                                      ),
-                                      glm::vec2(
-                                          mesh->mTextureCoords[0][v].x,
-                                          mesh->mTextureCoords[0][v].y
-                                      )
-                                  ));
+            vertices.emplace_back();
+            gfx::VertexP3N3UV2 &vert = vertices.back();
+            vert.position = glm::vec3(
+                                mesh->mVertices[v].x,
+                                mesh->mVertices[v].y,
+                                mesh->mVertices[v].z
+                            );
+
+            vert.normal = glm::vec3(
+                              mesh->mNormals[v].x,
+                              mesh->mNormals[v].y,
+                              mesh->mNormals[v].z
+                          );
+
+            vert.uv = glm::vec2(
+                          mesh->mTextureCoords[0][v].x,
+                          mesh->mTextureCoords[0][v].y
+                      );
         }
 
         // Process indices
@@ -149,19 +154,56 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
             diffuseTexture = &getTexture(relativeDirectory + diffusePath.C_Str()).get();
         }
 
-        // Save mesh
-        meshes.emplace_back(
-            gfx::Geometry(device_, vertices, indices),
+        // Optimize mesh
+        std::vector<u32> remap(indices.size());
+        meshopt_generateVertexRemap(remap.data(), indices.data(), indices.size(), vertices.data(), vertices.size(),
+                                    sizeof(vertices[0]));
+
+        std::vector<u32> optimizedIndices(indices.size());
+        meshopt_remapIndexBuffer(optimizedIndices.data(), indices.data(), indices.size(), remap.data());
+
+        std::vector<gfx::VertexP3N3UV2> optimizedVertices(vertices.size());
+        meshopt_remapVertexBuffer(optimizedVertices.data(), vertices.data(), vertices.size(), sizeof(vertices[0]),
+                                  remap.data());
+
+        // Save optimized mesh
+        lodMeshes[0].emplace_back(
+            gfx::Geometry(device_, optimizedVertices, optimizedIndices),
             gfx::Material(*diffuseTexture)
         );
+
+        // Generate LODs
+        std::vector<gfx::VertexP3> vertexPositions(optimizedVertices.size());
+        for (u32 i = 0; i < optimizedVertices.size(); ++i) {
+            vertexPositions[i].position = optimizedVertices[i].position;
+        }
+
+        u32 lastIndexCount = optimizedIndices.size();
+        for (u32 i = 1; i < NUM_LOD; ++i) {
+            // Half the number of indices each lod level
+            u32 targetIndices = optimizedIndices.size() * std::pow(0.5f, i);
+            f32 targetError = 1e-2f;
+
+            std::vector<u32> lodIndices(optimizedIndices.size());
+            lodIndices.resize(meshopt_simplify(lodIndices.data(), optimizedIndices.data(), optimizedIndices.size(),
+                                               &vertexPositions[0].position.x, vertexPositions.size(), sizeof(vertexPositions[0]),
+                                               targetIndices, targetError));
+
+            if (lodIndices.size() != lastIndexCount) {
+                // Create new mesh but reuse vertex buffer from LOD0, we're just changing indices
+                lodMeshes[i].emplace_back(gfx::Geometry(device_, lodMeshes[0].back().getGeometry(), lodIndices),
+                                          gfx::Material(*diffuseTexture));
+            } else {
+                // Otherwise, # of indices didn't change so just re-use previous mesh
+                lodMeshes[i].emplace_back(lodMeshes[i-1].back());
+            }
+
+            lastIndexCount = lodIndices.size();
+        }
     }
 
-    loadModel(model_path, meshes);
+    modelMeshes_.emplace(model_path, std::make_unique<std::vector<std::vector<gfx::Mesh>>>(lodMeshes));
     return true;
-}
-
-void ResourceManager::loadModel(const std::string &name, const std::vector<gfx::Mesh> &meshes) {
-    modelMeshes_.emplace(name, std::make_unique<std::vector<gfx::Mesh>>(meshes));
 }
 
 bool ResourceManager::loadTextureFromFile(const std::string &texture_path) {

@@ -271,8 +271,8 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                 PerMeshShadowPass perMesh = {};
                 perMesh.model = transform->getModelMatrix();
 
-                // Iterate over meshes in model
-                for (const gfx::Mesh &mesh : model->getMeshes()) {
+                // Iterate over meshes in model at max lod
+                for (const gfx::Mesh &mesh : model->getMeshes(ResourceManager::MAX_LOD)) {
                     // Send to shader
                     gfx::DescriptorSet perMeshSet(shadowPassPoint, 0, 1);
                     perMeshSet.setUniformBuffer(0, perMesh);
