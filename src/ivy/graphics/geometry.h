@@ -29,6 +29,14 @@ public:
 
     void draw(CommandBuffer &cmd) const;
 
+    [[nodiscard]] u32 getNumVertices() const {
+        return numVertices_;
+    }
+
+    [[nodiscard]] u32 getNumIndices() const {
+        return numIndices_;
+    }
+
 private:
     u32 numVertices_;
     u32 numIndices_;

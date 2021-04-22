@@ -100,7 +100,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
                                              aiProcess_Triangulate | aiProcess_GenUVCoords |
                                              aiProcess_GenNormals);
     if (!scene) {
-        Log::warn("Failed to read resource '%': %", filePath, importer.GetErrorString());
+        Log::warn("Failed to read resource %: %", filePath, importer.GetErrorString());
         return false;
     }
 
@@ -189,13 +189,13 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
                                                &vertexPositions[0].position.x, vertexPositions.size(), sizeof(vertexPositions[0]),
                                                targetIndices, targetError));
 
-            if (lodIndices.size() != lastIndexCount) {
+            if (lodIndices.size() == lastIndexCount || lodIndices.empty()) {
+                // Re-use mesh from previous LOD
+                lodMeshes[i].emplace_back(lodMeshes[i-1].back());
+            } else {
                 // Create new mesh but reuse vertex buffer from LOD0, we're just changing indices
                 lodMeshes[i].emplace_back(gfx::Geometry(device_, lodMeshes[0].back().getGeometry(), lodIndices),
                                           gfx::Material(*diffuseTexture));
-            } else {
-                // Otherwise, # of indices didn't change so just re-use previous mesh
-                lodMeshes[i].emplace_back(lodMeshes[i-1].back());
             }
 
             lastIndexCount = lodIndices.size();
@@ -207,7 +207,9 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
 }
 
 bool ResourceManager::loadTextureFromFile(const std::string &texture_path) {
-    std::filesystem::path filePath = std::filesystem::path(resourceDirectory_ + texture_path).lexically_normal();
+    std::string full = resourceDirectory_ + texture_path;
+    std::replace(full.begin(), full.end(), '\\', '/');
+    std::filesystem::path filePath = std::filesystem::path(full).lexically_normal();
 
     // Read image
     i32 width, height;

@@ -91,7 +91,7 @@ private:
 class PointLight : public Component {
 public:
     explicit PointLight(glm::vec3 color = glm::vec3(1), f32 intensity = 1.0f,
-                        bool casts_shadows = true, f32 shadow_bias = 0.005f, f32 near_plane = 0.01f, f32 far_plane = 10.0f)
+                        bool casts_shadows = true, f32 shadow_bias = 0.005f, f32 near_plane = 0.01f, f32 far_plane = 100.0f)
         : color_(color), intensity_(intensity), castsShadows_(casts_shadows), shadowBias_(shadow_bias),
           nearPlane_(near_plane), farPlane_(far_plane) {}
 

@@ -153,6 +153,8 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
 
     createSwapchain();
 
+    u32 numImages = swapchainImageViews_.size();
+
     //----------------------------------
     // Create command pool and buffers
     //----------------------------------
@@ -168,7 +170,7 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     });
 
     // Command buffers
-    commandBuffers_.resize(swapchainImageViews_.size());
+    commandBuffers_.resize(numImages);
     VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
     commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     commandBufferAllocateInfo.commandPool = commandPool_;
@@ -195,14 +197,14 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     inFlightFences_.resize(options_.numFramesInFlight);
 
     for (u32 i = 0; i < options_.numFramesInFlight; ++i) {
-        VK_CHECKF(vkCreateSemaphore(device_, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphores_[i]));
-        VK_CHECKF(vkCreateSemaphore(device_, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores_[i]));
-        VK_CHECKF(vkCreateFence(device_, &fenceCreateInfo, nullptr, &inFlightFences_[i]));
+        VK_CHECKF(vkCreateSemaphore(device_, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphores_.at(i)));
+        VK_CHECKF(vkCreateSemaphore(device_, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores_.at(i)));
+        VK_CHECKF(vkCreateFence(device_, &fenceCreateInfo, nullptr, &inFlightFences_.at(i)));
 
         cleanupStack_.emplace([ = ]() {
-            vkDestroyFence(device_, inFlightFences_[i], nullptr);
-            vkDestroySemaphore(device_, renderFinishedSemaphores_[i], nullptr);
-            vkDestroySemaphore(device_, imageAvailableSemaphores_[i], nullptr);
+            vkDestroyFence(device_, inFlightFences_.at(i), nullptr);
+            vkDestroySemaphore(device_, renderFinishedSemaphores_.at(i), nullptr);
+            vkDestroySemaphore(device_, imageAvailableSemaphores_.at(i), nullptr);
         });
     }
 
@@ -214,13 +216,13 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
 
     std::vector<VkDescriptorPoolSize> poolSizes;
     poolSizes.emplace_back(VkDescriptorPoolSize{
-        VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, limits_.maxDescriptorSetInputAttachments * 2
+        VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1024
     });
     poolSizes.emplace_back(VkDescriptorPoolSize{
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, limits_.maxDescriptorSetUniformBuffers * 2
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4096
     });
     poolSizes.emplace_back(VkDescriptorPoolSize{
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, limits_.maxDescriptorSetSampledImages * 2
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024
     });
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -229,8 +231,13 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     descriptorPoolCreateInfo.poolSizeCount = (u32) poolSizes.size();
     descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
+    Log::debug("Creating % descriptor pools with the following pool sizes:");
+    for (auto& poolSize : poolSizes) {
+        Log::debug("- % %", poolSize.descriptorCount, vk_descriptor_type_to_string(poolSize.type));
+    }
+
     // Make pools
-    for (u32 i = 0; i < options_.numFramesInFlight; ++i) {
+    for (u32 i = 0; i < numImages; ++i) {
         VkDescriptorPool pool;
         VK_CHECKF(vkCreateDescriptorPool(device_, &descriptorPoolCreateInfo, nullptr, &pool));
         cleanupStack_.emplace([ = ]() {
@@ -241,18 +248,20 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     }
 
     // Make descriptor set caches
-    descriptorSetCaches_.resize(options_.numFramesInFlight);
+    descriptorSetCaches_.resize(numImages);
 
     //----------------------------------
     // Create uniform buffer
     //----------------------------------
 
-    uniformBuffers_.resize(options_.numFramesInFlight);
-    uniformBufferMappedPointers_.resize(options_.numFramesInFlight);
-    uniformBufferOffsets_.resize(options_.numFramesInFlight);
+    uniformBuffers_.resize(numImages);
+    uniformBufferMappedPointers_.resize(numImages);
+    uniformBufferOffsets_.resize(numImages);
     uniformBufferSize_ = 1024 * 1024;
 
-    for (u32 i = 0; i < options_.numFramesInFlight; ++i) {
+    Log::debug("Allocating % buffers of size %", numImages, uniformBufferSize_);
+
+    for (u32 i = 0; i < numImages; ++i) {
         VmaAllocationCreateInfo allocCI = {};
         allocCI.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         allocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -265,9 +274,9 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
 
         VmaAllocation allocation;
         VmaAllocationInfo allocInfo;
-        VK_CHECKF(vmaCreateBuffer(allocator_, &bufferCI, &allocCI, &uniformBuffers_[i], &allocation, &allocInfo));
+        VK_CHECKF(vmaCreateBuffer(allocator_, &bufferCI, &allocCI, &uniformBuffers_.at(i), &allocation, &allocInfo));
         cleanupStack_.emplace([ = ]() {
-            vmaDestroyBuffer(allocator_, uniformBuffers_[i], allocation);
+            vmaDestroyBuffer(allocator_, uniformBuffers_.at(i), allocation);
         });
 
         uniformBufferMappedPointers_.at(i) = allocInfo.pMappedData;
@@ -290,22 +299,22 @@ void RenderDevice::beginFrame() {
     // Wait for frame to finish
     //----------------------------------
 
-    vkWaitForFences(device_, 1, &inFlightFences_[currentFrame_], VK_TRUE, UINT64_MAX);
-    vkResetFences(device_, 1, &inFlightFences_[currentFrame_]);
+    vkWaitForFences(device_, 1, &inFlightFences_.at(currentFrame_), VK_TRUE, UINT64_MAX);
+    vkResetFences(device_, 1, &inFlightFences_.at(currentFrame_));
 
     //----------------------------------
     // Get image from swapchain
     //----------------------------------
 
-    vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX, imageAvailableSemaphores_[currentFrame_], VK_NULL_HANDLE,
-                          &swapImageIndex_);
+    VK_CHECKF(vkAcquireNextImageKHR(device_, swapchain_, 1e9, imageAvailableSemaphores_.at(currentFrame_), VK_NULL_HANDLE,
+                          &swapImageIndex_));
 
     //----------------------------------
     // Reset per-frame descriptor data
     //----------------------------------
 
-    descriptorSetCaches_[swapImageIndex_].markAllAsAvailable();
-    uniformBufferOffsets_[swapImageIndex_] = 0;
+    descriptorSetCaches_.at(swapImageIndex_).markAllAsAvailable();
+    uniformBufferOffsets_.at(swapImageIndex_) = 0;
 
     //----------------------------------
     // Begin recording command buffer
@@ -313,11 +322,11 @@ void RenderDevice::beginFrame() {
 
     VkCommandBufferBeginInfo commandBufferBeginInfo = {};
     commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    VK_CHECKF(vkBeginCommandBuffer(commandBuffers_[swapImageIndex_], &commandBufferBeginInfo));
+    VK_CHECKF(vkBeginCommandBuffer(commandBuffers_.at(swapImageIndex_), &commandBufferBeginInfo));
 }
 
 void RenderDevice::endFrame() {
-    VK_CHECKF(vkEndCommandBuffer(commandBuffers_[swapImageIndex_]));
+    VK_CHECKF(vkEndCommandBuffer(commandBuffers_.at(swapImageIndex_)));
 
     //----------------------------------
     // Debug stats for this frame
@@ -325,12 +334,12 @@ void RenderDevice::endFrame() {
 
     Log::verbose("+-- Frame stats for % -----------", swapImageIndex_);
     Log::verbose("| %/% bytes (%\\%) of the buffer were used for uniform buffers",
-                 uniformBufferOffsets_[swapImageIndex_], uniformBufferSize_,
-                 100.0f * (uniformBufferOffsets_[swapImageIndex_] / (f32)uniformBufferSize_));
+                 uniformBufferOffsets_.at(swapImageIndex_), uniformBufferSize_,
+                 100.0f * (uniformBufferOffsets_.at(swapImageIndex_) / (f32)uniformBufferSize_));
     Log::verbose("| %/% descriptor sets were used this frame",
-                 descriptorSetCaches_[swapImageIndex_].countNumUsed(), maxSets_);
+                 descriptorSetCaches_.at(swapImageIndex_).countNumUsed(), maxSets_);
     Log::verbose("| % descriptor sets are cached for this frame",
-                 descriptorSetCaches_[swapImageIndex_].countTotalCached());
+                 descriptorSetCaches_.at(swapImageIndex_).countTotalCached());
     Log::verbose("+-------------------------------");
 
     //----------------------------------
@@ -342,16 +351,16 @@ void RenderDevice::endFrame() {
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
     submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &imageAvailableSemaphores_[currentFrame_];
+    submitInfo.pWaitSemaphores = &imageAvailableSemaphores_.at(currentFrame_);
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers_[swapImageIndex_];
+    submitInfo.pCommandBuffers = &commandBuffers_.at(swapImageIndex_);
 
     submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &renderFinishedSemaphores_[currentFrame_];
+    submitInfo.pSignalSemaphores = &renderFinishedSemaphores_.at(currentFrame_);
 
-    VK_CHECKF(vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]));
+    VK_CHECKF(vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_.at(currentFrame_)));
 
     //----------------------------------
     // Presentation
@@ -360,7 +369,7 @@ void RenderDevice::endFrame() {
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &renderFinishedSemaphores_[currentFrame_];
+    presentInfo.pWaitSemaphores = &renderFinishedSemaphores_.at(currentFrame_);
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &swapchain_;
     presentInfo.pImageIndices = &swapImageIndex_;
@@ -371,7 +380,7 @@ void RenderDevice::endFrame() {
 }
 
 CommandBuffer RenderDevice::getCommandBuffer() {
-    return CommandBuffer(commandBuffers_[swapImageIndex_]);
+    return CommandBuffer(commandBuffers_.at(swapImageIndex_));
 }
 
 VkQueue RenderDevice::getGraphicsQueue() {
@@ -644,16 +653,16 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
 
                 if (infoPair.first == GraphicsPass::SwapchainName) {
                     // Using swapchain image & imageview
-                    view = swapchainImageViews_[frame];
-                    image = swapchainImages_[frame];
+                    view = swapchainImageViews_.at(frame);
+                    image = swapchainImages_.at(frame);
                 } else if (desc.texture) {
                     // The image & image for this attachment was passed to the graphics pass
                     view = desc.texture->getImageView();
                     image = desc.texture->getImage();
                 } else if (!firstFramebuffer) {
                     // The image & imageview was already created
-                    view = framebuffers_[renderPass].front().getView(infoPair.first);
-                    image = framebuffers_[renderPass].front().getImage(infoPair.first);
+                    view = framebuffers_.at(renderPass).front().getView(infoPair.first);
+                    image = framebuffers_.at(renderPass).front().getImage(infoPair.first);
                 } else {
                     // Need to create image & imageview for this attachment
 
@@ -727,12 +736,12 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
                 vkDestroyFramebuffer(device_, framebuffer, nullptr);
             });
 
-            framebuffers_[renderPass].emplace_back(Framebuffer(framebuffer, swapchainExtent_,
+            framebuffers_.at(renderPass).emplace_back(Framebuffer(framebuffer, swapchainExtent_,
                                                                attachmentViews, attachmentImages));
         }
     }
 
-    return framebuffers_[renderPass][swapImageIndex_ % numFramebuffers];
+    return framebuffers_.at(renderPass)[swapImageIndex_ % numFramebuffers];
 }
 
 VkBuffer RenderDevice::createVertexBuffer(const void *data, VkDeviceSize size) {
@@ -879,7 +888,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const
         // We didn't find a descriptor set with the right layout, we need to allocate a new one
         VkDescriptorSetAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = pools_[swapImageIndex_];
+        allocInfo.descriptorPool = pools_.at(swapImageIndex_);
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &layout;
 
@@ -1269,7 +1278,7 @@ void RenderDevice::createSwapchain() {
     for (u32 i = 0; i < numSwapchainImages; ++i) {
         VkImageViewCreateInfo imageViewCreateInfo = {};
         imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        imageViewCreateInfo.image = swapchainImages_[i];
+        imageViewCreateInfo.image = swapchainImages_.at(i);
         imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         imageViewCreateInfo.format = swapchainFormat_;
 
@@ -1280,9 +1289,9 @@ void RenderDevice::createSwapchain() {
         imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
         imageViewCreateInfo.subresourceRange.layerCount = 1;
 
-        VK_CHECKF(vkCreateImageView(device_, &imageViewCreateInfo, nullptr, &swapchainImageViews_[i]));
+        VK_CHECKF(vkCreateImageView(device_, &imageViewCreateInfo, nullptr, &swapchainImageViews_.at(i)));
         cleanupStack_.emplace([ = ]() {
-            vkDestroyImageView(device_, swapchainImageViews_[i], nullptr);
+            vkDestroyImageView(device_, swapchainImageViews_.at(i), nullptr);
         });
     }
 }

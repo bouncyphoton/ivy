@@ -246,7 +246,7 @@ private:
 
     std::vector<VkDescriptorPool> pools_;
     std::vector<DescriptorSetCache> descriptorSetCaches_;
-    u32 maxSets_ = 2048;
+    u32 maxSets_ = 4096;
 
     std::vector<VkBuffer> uniformBuffers_;
     std::vector<VkDeviceSize> uniformBufferOffsets_;

@@ -1,4 +1,5 @@
-const float PI = 3.14159265358979;
+#ifndef UTILS_GLSL
+#define UTILS_GLSL
 
 vec3 depthToWorldPos(vec2 uv, float depth, mat4 invProjection, mat4 invView) {
     // To clip space
@@ -12,3 +13,5 @@ vec3 depthToWorldPos(vec2 uv, float depth, mat4 invProjection, mat4 invView) {
     vec4 positionWS = invView * positionVS;
     return positionWS.xyz;
 }
+
+#endif // UTILS_GLSL

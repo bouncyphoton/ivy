@@ -51,7 +51,7 @@ void TestGame::init() {
 
         EntityHandle light = scene_.createEntity();
         light->setComponent(Transform(glm::vec3(x, y, z)));
-        light->setComponent(PointLight(glm::vec3(rand(), rand(), rand()) / (f32)RAND_MAX, 2));
+        light->setComponent(PointLight(glm::vec3(rand(), rand(), rand()) / (f32)RAND_MAX, 400));
         light->setTag("pnt_light");
     }
 
@@ -126,7 +126,7 @@ void TestGame::update() {
         if (EntityHandle camera = scene_.findEntityWithAllComponents<Transform, Camera>()) {
             EntityHandle light = scene_.createEntity();
             light->setComponent(*camera->getComponent<Transform>());
-            light->setComponent(PointLight(glm::vec3(rand(), rand(), rand()) / (f32)RAND_MAX, 2));
+            light->setComponent(PointLight(glm::vec3(rand(), rand(), rand()) / (f32)RAND_MAX, 400));
         }
     }
 
