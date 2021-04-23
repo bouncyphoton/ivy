@@ -12,4 +12,14 @@ vec3 ACESFilm(vec3 x) {
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
+// Not quite sRGB
+
+vec3 srgbToLinear(vec3 x) {
+    return pow(x, vec3(2.2));
+}
+
+vec3 linearToSrgb(vec3 x) {
+    return pow(x, vec3(1 / 2.2));
+}
+
 #endif // TONEMAP_GLSL

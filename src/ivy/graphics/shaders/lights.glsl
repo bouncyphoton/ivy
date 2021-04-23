@@ -67,6 +67,10 @@ Shadow getShadow(Light light, vec3 surface_position) {
         // Point light shadow map stores linear depth
         shadow.shadowDepth = mix(nearPlane, farPlane, texture(uShadowMapPoint, vec4(lightDir, shadowIndex)).r);
         shadow.currentDepth = length(lightDir);
+
+        if (shadowIndex == uint(-1)) {
+            shadow.shadowDepth = farPlane;
+        }
         break;
     }
     return shadow;

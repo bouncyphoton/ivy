@@ -40,7 +40,8 @@ void TestGame::init() {
         EntityHandle helmet = scene_.createEntity();
         helmet->setComponent(Transform(glm::vec3((i - 5) * 2, 1, 0), glm::vec3(0), glm::vec3(2)));
         helmet->setTag("helmet");
-        helmet->setComponent(Model(resourceManager.getModel("models/glTF-Sample-Models/2.0/FlightHelmet/glTF/FlightHelmet.gltf")));
+        helmet->setComponent(Model(
+                                 resourceManager.getModel("models/glTF-Sample-Models/2.0/FlightHelmet/glTF/FlightHelmet.gltf")));
     }
 
     // Add lights
@@ -99,7 +100,7 @@ void TestGame::update() {
         debugMode_ = Renderer::DebugMode::NORMAL;
         Log::debug("Rendering normal gbuffer");
     }  else if (input.isKeyPressed(GLFW_KEY_4)) {
-        debugMode_ = Renderer::DebugMode::WORLD;
+        debugMode_ = Renderer::DebugMode::OCCLUSION_ROUGHNESS_METALLIC;
         Log::debug("Rendering derived world position");
     }  else if (input.isKeyPressed(GLFW_KEY_5)) {
         debugMode_ = Renderer::DebugMode::SHADOW_MAP;

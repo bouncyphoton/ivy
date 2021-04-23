@@ -18,7 +18,7 @@ public:
      * \brief Debug rendering mode
      */
     enum class DebugMode {
-        FULL, DIFFUSE, NORMAL, WORLD, SHADOW_MAP
+        FULL, DIFFUSE, NORMAL, OCCLUSION_ROUGHNESS_METALLIC, SHADOW_MAP
     };
 
     explicit Renderer(ivy::gfx::RenderDevice &render_device);

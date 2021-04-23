@@ -99,7 +99,8 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(),
                                              aiProcess_Triangulate | aiProcess_GenUVCoords |
-                                             aiProcess_GenNormals | aiProcess_FlipUVs);
+                                             aiProcess_GenNormals | aiProcess_FlipUVs |
+                                             aiProcess_CalcTangentSpace);
     if (!scene) {
         Log::warn("Failed to read resource %: %", filePath, importer.GetErrorString());
         return false;
@@ -107,7 +108,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
 
     // Process meshes
     for (u32 m = 0; m < scene->mNumMeshes; ++m) {
-        std::vector<gfx::VertexP3N3UV2> vertices;
+        std::vector<gfx::VertexP3N3T3B3UV2> vertices;
         std::vector<u32> indices;
 
         aiMesh *mesh = scene->mMeshes[m];
@@ -116,7 +117,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         vertices.reserve(mesh->mNumVertices);
         for (u32 v = 0; v < mesh->mNumVertices; ++v) {
             vertices.emplace_back();
-            gfx::VertexP3N3UV2 &vert = vertices.back();
+            gfx::VertexP3N3T3B3UV2 &vert = vertices.back();
             vert.position = glm::vec3(
                                 mesh->mVertices[v].x,
                                 mesh->mVertices[v].y,
@@ -128,6 +129,18 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
                               mesh->mNormals[v].y,
                               mesh->mNormals[v].z
                           );
+
+            vert.tangent = glm::vec3(
+                    mesh->mTangents[v].x,
+                    mesh->mTangents[v].y,
+                    mesh->mTangents[v].z
+            );
+
+            vert.bitangent = glm::vec3(
+                    mesh->mBitangents[v].x,
+                    mesh->mBitangents[v].y,
+                    mesh->mBitangents[v].z
+            );
 
             vert.uv = glm::vec2(
                           mesh->mTextureCoords[0][v].x,
@@ -155,7 +168,13 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
             diffuseTexture = &getTexture(relativeDirectory + texPath.C_Str()).get();
         }
 
-        // TODO: normal map
+        // Normal
+        const gfx::Texture *normalTexture = textureNormal_;
+        if (aiMat->GetTextureCount(aiTextureType_NORMALS) > 0) {
+            aiString texPath;
+            aiMat->GetTexture(aiTextureType_NORMALS, 0, &texPath);
+            normalTexture = &getTexture(relativeDirectory + texPath.C_Str()).get();
+        }
 
         // Ambient occlusion
         const gfx::Texture *occlusionTexture = textureWhite_;
@@ -200,14 +219,14 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         std::vector<u32> optimizedIndices(indices.size());
         meshopt_remapIndexBuffer(optimizedIndices.data(), indices.data(), indices.size(), remap.data());
 
-        std::vector<gfx::VertexP3N3UV2> optimizedVertices(vertices.size());
+        std::vector<gfx::VertexP3N3T3B3UV2> optimizedVertices(vertices.size());
         meshopt_remapVertexBuffer(optimizedVertices.data(), vertices.data(), vertices.size(), sizeof(vertices[0]),
                                   remap.data());
 
         // Save optimized mesh
         lodMeshes[0].emplace_back(
             gfx::Geometry(device_, optimizedVertices, optimizedIndices),
-            gfx::Material(*diffuseTexture, *occlusionTexture, *roughnessTexture, *metallicTexture)
+            gfx::Material(*diffuseTexture, *normalTexture, *occlusionTexture, *roughnessTexture, *metallicTexture)
         );
 
         // Generate LODs
@@ -233,7 +252,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
             } else {
                 // Create new mesh but reuse vertex buffer from LOD0, we're just changing indices
                 lodMeshes[i].emplace_back(gfx::Geometry(device_, lodMeshes[0].back().getGeometry(), lodIndices),
-                                          gfx::Material(*diffuseTexture, *occlusionTexture, *roughnessTexture, *metallicTexture));
+                                          gfx::Material(*diffuseTexture, *normalTexture, *occlusionTexture, *roughnessTexture, *metallicTexture));
             }
 
             lastIndexCount = lodIndices.size();

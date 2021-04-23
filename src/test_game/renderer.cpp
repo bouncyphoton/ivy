@@ -92,8 +92,8 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     gfx::SubpassBuilder()
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/shadow_directional.vert.spv")
                     // trivial fragment shader
-                    .addVertexDescription(gfx::VertexP3N3UV2::getBindingDescriptions(),
-                                          gfx::VertexP3N3UV2::getAttributeDescriptions())
+                    .addVertexDescription(gfx::VertexP3N3T3B3UV2::getBindingDescriptions(),
+                                          gfx::VertexP3N3T3B3UV2::getAttributeDescriptions())
                     .addUniformBufferDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
                     .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_VERTEX_BIT)
                     .addDepthAttachment("depth")
@@ -112,8 +112,8 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/shadow_point.vert.spv")
                     .addShader(gfx::Shader::StageEnum::GEOMETRY, "../assets/shaders/shadow_point.geom.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/shadow_point.frag.spv")
-                    .addVertexDescription(gfx::VertexP3N3UV2::getBindingDescriptions(),
-                                          gfx::VertexP3N3UV2::getAttributeDescriptions())
+                    .addVertexDescription(gfx::VertexP3N3T3B3UV2::getBindingDescriptions(),
+                                          gfx::VertexP3N3T3B3UV2::getAttributeDescriptions())
                     .addUniformBufferDescriptor(0, 0, VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_VERTEX_BIT)
                     .addDepthAttachment("depth")
@@ -134,8 +134,8 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     gfx::SubpassBuilder()
                     .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/gbuffer.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/gbuffer.frag.spv")
-                    .addVertexDescription(gfx::VertexP3N3UV2::getBindingDescriptions(),
-                                          gfx::VertexP3N3UV2::getAttributeDescriptions())
+                    .addVertexDescription(gfx::VertexP3N3T3B3UV2::getBindingDescriptions(),
+                                          gfx::VertexP3N3T3B3UV2::getAttributeDescriptions())
                     .addColorAttachment("diffuse", 0)
                     .addColorAttachment("normal", 1)
                     .addColorAttachment("occlusion_roughness_metallic", 2)
@@ -145,6 +145,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addTextureDescriptor(1, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addTextureDescriptor(1, 2, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addTextureDescriptor(1, 3, VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .addTextureDescriptor(1, 4, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build()
                    )
         .addSubpass("lighting_pass",
@@ -457,9 +458,10 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                     const gfx::Material &mat = mesh.getMaterial();
                     gfx::DescriptorSet materialSet(lightingPass, subpassIdx, 1);
                     materialSet.setTexture(0, mat.getDiffuseTexture(), linearSampler_);
-                    materialSet.setTexture(1, mat.getOcclusionTexture(), linearSampler_);
-                    materialSet.setTexture(2, mat.getRoughnessTexture(), linearSampler_);
-                    materialSet.setTexture(3, mat.getMetallicTexture(), linearSampler_);
+                    materialSet.setTexture(1, mat.getNormalTexture(), linearSampler_);
+                    materialSet.setTexture(2, mat.getOcclusionTexture(), linearSampler_);
+                    materialSet.setTexture(3, mat.getRoughnessTexture(), linearSampler_);
+                    materialSet.setTexture(4, mat.getMetallicTexture(), linearSampler_);
                     cmd.setDescriptorSet(device_, lightingPass, materialSet);
 
                     // Draw this mesh

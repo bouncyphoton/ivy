@@ -23,12 +23,12 @@ layout (set = 2, binding = 0) uniform PerLight { Light light; } uLight;
 #include "utils.glsl"   // depthToWorldPos
 #include "lights.glsl"  // Light, getIlluminance
 #include "brdf.glsl"    // brdf
-#include "tonemap.glsl" // ACESFilm
+#include "tonemap.glsl" // ACESFilm, srgbToLinear, linearToSrgb
 
 const uint DEBUG_FULL       = 0;
 const uint DEBUG_DIFFUSE    = 1;
 const uint DEBUG_NORMAL     = 2;
-const uint DEBUG_WORLD      = 3;
+const uint DEBUG_ORM        = 3;
 const uint DEBUG_SHADOW_MAP = 4;
 
 void main() {
@@ -37,7 +37,7 @@ void main() {
     if (depth == 1) {
         discard;
     }
-    vec3 diffuse = pow(subpassLoad(iDiffuse).rgb, vec3(2.2));
+    vec3 diffuse = srgbToLinear(subpassLoad(iDiffuse).rgb);
     vec3 normal = normalize(subpassLoad(iNormal).xyz);
     float occlusion = subpassLoad(iOcclusionRoughnessMetallic).r;
     float roughness = subpassLoad(iOcclusionRoughnessMetallic).g;
@@ -62,7 +62,7 @@ void main() {
         case DEBUG_NORMAL:
             color = normal * 0.5 + 0.5;
             break;
-        case DEBUG_WORLD:
+        case DEBUG_ORM:
             color = vec3(occlusion, roughness, metallic);
             break;
         case DEBUG_SHADOW_MAP:
@@ -72,7 +72,7 @@ void main() {
 
     // Tonemap and gamma correct
     color = ACESFilm(color);
-    color = pow(color, vec3(1 / 2.2));
+    color = linearToSrgb(color);
 
     oFragColor = vec4(color, 1);
 }
