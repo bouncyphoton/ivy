@@ -4,6 +4,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/pbrmaterial.h>
 
 #include <meshoptimizer.h>
 
@@ -98,7 +99,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(filePath.generic_string().c_str(),
                                              aiProcess_Triangulate | aiProcess_GenUVCoords |
-                                             aiProcess_GenNormals);
+                                             aiProcess_GenNormals | aiProcess_FlipUVs);
     if (!scene) {
         Log::warn("Failed to read resource %: %", filePath, importer.GetErrorString());
         return false;
@@ -149,9 +150,46 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         // Diffuse
         const gfx::Texture *diffuseTexture = textureWhite_;
         if (aiMat->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
-            aiString diffusePath;
-            aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &diffusePath);
-            diffuseTexture = &getTexture(relativeDirectory + diffusePath.C_Str()).get();
+            aiString texPath;
+            aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &texPath);
+            diffuseTexture = &getTexture(relativeDirectory + texPath.C_Str()).get();
+        }
+
+        // TODO: normal map
+
+        // Ambient occlusion
+        const gfx::Texture *occlusionTexture = textureWhite_;
+        if (aiMat->GetTextureCount(aiTextureType_AMBIENT_OCCLUSION) > 0) {
+            aiString texPath;
+            aiMat->GetTexture(aiTextureType_AMBIENT_OCCLUSION, 0, &texPath);
+            occlusionTexture = &getTexture(relativeDirectory + texPath.C_Str()).get();
+        }
+
+        // Roughness
+        const gfx::Texture *roughnessTexture = textureWhite_;
+        if (aiMat->GetTextureCount(aiTextureType_DIFFUSE_ROUGHNESS) > 0) {
+            aiString texPath;
+            aiMat->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &texPath);
+            roughnessTexture = &getTexture(relativeDirectory + texPath.C_Str()).get();
+        }
+
+        // Metal
+        const gfx::Texture *metallicTexture = textureBlackTransparent_;
+        if (aiMat->GetTextureCount(aiTextureType_METALNESS) > 0) {
+            aiString texPath;
+            aiMat->GetTexture(aiTextureType_METALNESS, 0, &texPath);
+            metallicTexture = &getTexture(relativeDirectory + texPath.C_Str()).get();
+        }
+
+        // If ao, roughness, and metallic are in same texture
+        aiString texPath;
+        if (aiMat->GetTexture(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLICROUGHNESS_TEXTURE, &texPath) == aiReturn_SUCCESS) {
+            loadTextureFromFile(relativeDirectory + texPath.C_Str(), true);
+
+            // Guess what channels hold what data
+            occlusionTexture = &getTexture(relativeDirectory + texPath.C_Str() + "_r").get();
+            roughnessTexture = &getTexture(relativeDirectory + texPath.C_Str() + "_g").get();
+            metallicTexture = &getTexture(relativeDirectory + texPath.C_Str() + "_b").get();
         }
 
         // Optimize mesh
@@ -169,7 +207,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         // Save optimized mesh
         lodMeshes[0].emplace_back(
             gfx::Geometry(device_, optimizedVertices, optimizedIndices),
-            gfx::Material(*diffuseTexture)
+            gfx::Material(*diffuseTexture, *occlusionTexture, *roughnessTexture, *metallicTexture)
         );
 
         // Generate LODs
@@ -191,11 +229,11 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
 
             if (lodIndices.size() == lastIndexCount || lodIndices.empty()) {
                 // Re-use mesh from previous LOD
-                lodMeshes[i].emplace_back(lodMeshes[i-1].back());
+                lodMeshes[i].emplace_back(lodMeshes[i - 1].back());
             } else {
                 // Create new mesh but reuse vertex buffer from LOD0, we're just changing indices
                 lodMeshes[i].emplace_back(gfx::Geometry(device_, lodMeshes[0].back().getGeometry(), lodIndices),
-                                          gfx::Material(*diffuseTexture));
+                                          gfx::Material(*diffuseTexture, *occlusionTexture, *roughnessTexture, *metallicTexture));
             }
 
             lastIndexCount = lodIndices.size();
@@ -206,7 +244,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
     return true;
 }
 
-bool ResourceManager::loadTextureFromFile(const std::string &texture_path) {
+bool ResourceManager::loadTextureFromFile(const std::string &texture_path, bool split_channels) {
     std::string full = resourceDirectory_ + texture_path;
     std::replace(full.begin(), full.end(), '\\', '/');
     std::filesystem::path filePath = std::filesystem::path(full).lexically_normal();
@@ -220,6 +258,22 @@ bool ResourceManager::loadTextureFromFile(const std::string &texture_path) {
     u32 size = width * height * 4;
 
     loadTexture(texture_path, width, height, VK_FORMAT_R8G8B8A8_UNORM, data, size);
+
+    if (split_channels) {
+        std::vector<char> suffix = {'r', 'g', 'b', 'a'};
+        std::vector<std::vector<u8>> channels(suffix.size(), std::vector<u8>(width * height));
+
+        // Split channels
+        for (u32 i = 0; i < size; ++i) {
+            channels[i % channels.size()][i / channels.size()] = data[i];
+        }
+
+        // Load textures for each channel
+        for (u32 i = 0; i < suffix.size(); ++i) {
+            loadTexture(texture_path + "_" + suffix[i], width, height, VK_FORMAT_R8_UNORM,
+                        channels[i].data(), channels[i].size());
+        }
+    }
 
     // Free image data
     stbi_image_free(data);

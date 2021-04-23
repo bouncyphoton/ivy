@@ -35,23 +35,29 @@ TestGame::TestGame()
 void TestGame::init() {
     ResourceManager &resourceManager = engine_.getResourceManager();
 
-    // Add bunnies
+    // Add helmets
     for (i32 i = 0; i < 10; ++i) {
-        EntityHandle bunny = scene_.createEntity();
-        bunny->setComponent(Transform(glm::vec3((i - 5) * 2, 1, 0)));
-        bunny->setTag("bunny");
-        bunny->setComponent(Model(resourceManager.getModel("models/bunny.obj")));
+        EntityHandle helmet = scene_.createEntity();
+        helmet->setComponent(Transform(glm::vec3((i - 5) * 2, 1, 0), glm::vec3(0), glm::vec3(2)));
+        helmet->setTag("helmet");
+        helmet->setComponent(Model(resourceManager.getModel("models/glTF-Sample-Models/2.0/FlightHelmet/glTF/FlightHelmet.gltf")));
     }
 
     // Add lights
-    for (i32 i = 0; i < 16; ++i) {
-        f32 x = (f32) (i - 8) * 2;
-        f32 y = 1 + (i % 3 == 1 ? 3 : 0);
-        f32 z = (f32) ((i % 3) - 1) * 5;
+    for (i32 i = 0; i < 2; ++i) {
+        f32 x = (i - 1) * 5;
+        f32 y = 2;
+        f32 z = -5;
+
+        // Blue and pink looks nice
+        glm::vec3 colors[] = {
+            glm::vec3(10, 100, 255) / 255.0f,
+            glm::vec3(255, 60, 240) / 255.0f
+        };
 
         EntityHandle light = scene_.createEntity();
         light->setComponent(Transform(glm::vec3(x, y, z)));
-        light->setComponent(PointLight(glm::vec3(rand(), rand(), rand()) / (f32)RAND_MAX, 400));
+        light->setComponent(PointLight(colors[i], 400));
         light->setTag("pnt_light");
     }
 
@@ -67,7 +73,7 @@ void TestGame::init() {
     {
         EntityHandle camera = scene_.createEntity();
         camera->setTag("camera");
-        camera->setComponent(Transform(glm::vec3(10, 4, -1.4), glm::vec3(5.7, 2, 0)));
+        camera->setComponent(Transform(glm::vec3(0.25, 2, -1), glm::vec3(6.2, 2.5, 0)));
         camera->setComponent<Camera>();
     }
 }
@@ -138,12 +144,9 @@ void TestGame::update() {
             continue;
         }
 
-        // Move bunnies
-        if (entity->hasTag("bunny")) {
-            // Update the rotation and scale for the bunny
-            glm::vec3 pos = transform->getPosition();
-            transform->setRotation(glm::vec3(0, time, 0));
-            transform->setScale(glm::vec3(cosf(glm::length(pos) + time) * 0.5f + 0.5f));
+        // Update the rotation for the helmet
+        if (entity->hasTag("helmet")) {
+            transform->setRotation(glm::vec3(0, time * 0.5f, 0));
         }
 
         // Update camera
@@ -196,8 +199,8 @@ Options TestGame::getOptions() {
     Options options;
 
     options.appName = "Vulkan Deferred Rendering Demo | ivy engine";
-    options.renderWidth = 800;
-    options.renderHeight = 600;
+    options.renderWidth = 1600;
+    options.renderHeight = 900;
 
     return options;
 }

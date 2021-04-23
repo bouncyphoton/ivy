@@ -16,3 +16,6 @@
 [submodule "external/meshoptimizer"]
 	path = external/meshoptimizer
 	url = https://github.com/zeux/meshoptimizer.git
+[submodule "assets/models/glTF-Sample-Models"]
+	path = assets/models/glTF-Sample-Models
+	url = https://github.com/KhronosGroup/glTF-Sample-Models.git

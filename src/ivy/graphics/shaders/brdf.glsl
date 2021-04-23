@@ -43,7 +43,7 @@ float g_Smith(vec3 normal, vec3 view, vec3 light, float roughness) {
 }
 
 // lambertian diffuse + cook torrance microfacet
-vec3 brdf(vec3 diffuse, float roughness, float metallic, vec3 normal, vec3 to_eye, vec3 to_light) {
+vec3 brdf(vec3 diffuse, float occlusion, float roughness, float metallic, vec3 normal, vec3 to_eye, vec3 to_light) {
     vec3  halfVec      = normalize(to_eye + to_light);
     float viewDotHalf = max(0, dot(to_eye, halfVec));
 
@@ -57,7 +57,7 @@ vec3 brdf(vec3 diffuse, float roughness, float metallic, vec3 normal, vec3 to_ey
 
     vec3 Kd = (1 - Ks) * (1 - metallic) * diffuse / PI;
 
-    return Kd + Ks;
+    return (Kd + Ks) * occlusion;
 }
 
 #endif // BRDF_GLSL

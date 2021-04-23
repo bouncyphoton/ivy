@@ -48,7 +48,15 @@ private:
      */
     bool loadModelFromFile(const std::string &model_path);
 
-    bool loadTextureFromFile(const std::string &texture_path);
+    /**
+     * \brief Load a texture from file
+     * \param texture_path The path to the texture relative to the resource directory
+     * \param split_channels Whether or not to split the texture into separate textures, one for each channel
+     * If true, 4 additional textures will be generated that can be gotten by appending an _r, _g, _b, or _a to the
+     * end of the texture name
+     * \return Whether or not the texture was loaded successfully
+     */
+    bool loadTextureFromFile(const std::string &texture_path, bool split_channels = false);
 
     void loadTexture(const std::string &name, u32 width, u32 height, VkFormat format, u8 *data, u32 size);
 

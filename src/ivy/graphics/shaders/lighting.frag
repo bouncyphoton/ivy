@@ -3,7 +3,8 @@
 
 layout (input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput iDiffuse;
 layout (input_attachment_index = 1, set = 0, binding = 1) uniform subpassInput iNormal;
-layout (input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput iDepth;
+layout (input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput iOcclusionRoughnessMetallic;
+layout (input_attachment_index = 3, set = 0, binding = 3) uniform subpassInput iDepth;
 
 layout (location = 0) out vec4 oFragColor;
 
@@ -19,9 +20,10 @@ layout (set = 1, binding = 2) uniform samplerCubeArray uShadowMapPoint;
 
 layout (set = 2, binding = 0) uniform PerLight { Light light; } uLight;
 
-#include "utils.glsl"  // depthToWorldPos
-#include "lights.glsl" // Light, getIlluminance
-#include "brdf.glsl"   // brdf
+#include "utils.glsl"   // depthToWorldPos
+#include "lights.glsl"  // Light, getIlluminance
+#include "brdf.glsl"    // brdf
+#include "tonemap.glsl" // ACESFilm
 
 const uint DEBUG_FULL       = 0;
 const uint DEBUG_DIFFUSE    = 1;
@@ -35,9 +37,11 @@ void main() {
     if (depth == 1) {
         discard;
     }
-    vec3 diffuse = subpassLoad(iDiffuse).rgb;
+    vec3 diffuse = pow(subpassLoad(iDiffuse).rgb, vec3(2.2));
     vec3 normal = normalize(subpassLoad(iNormal).xyz);
-    // TODO: metallic and roughness
+    float occlusion = subpassLoad(iOcclusionRoughnessMetallic).r;
+    float roughness = subpassLoad(iOcclusionRoughnessMetallic).g;
+    float metallic = subpassLoad(iOcclusionRoughnessMetallic).b;
 
     // Derived variables
     vec2 uv       = vec2(gl_FragCoord.x, uFrame.resolution.y - gl_FragCoord.y) / uFrame.resolution;
@@ -50,7 +54,7 @@ void main() {
     vec3 color = vec3(0);
     switch (uFrame.debugMode) {
         case DEBUG_FULL:
-            color = brdf(diffuse, 1.0f, 0.0f, normal, -viewDir, lightDirection) * getIlluminance(uLight.light, normal, worldPos);
+            color = brdf(diffuse, occlusion, roughness, metallic, normal, -viewDir, lightDirection) * getIlluminance(uLight.light, normal, worldPos);
             break;
         case DEBUG_DIFFUSE:
             color = diffuse;
@@ -59,12 +63,16 @@ void main() {
             color = normal * 0.5 + 0.5;
             break;
         case DEBUG_WORLD:
-            color = fract(worldPos);
+            color = vec3(occlusion, roughness, metallic);
             break;
         case DEBUG_SHADOW_MAP:
-            color = texture(uShadowMapPoint, vec4(worldPos - lightDirection, uLight.light.shadowIndex)).rrr;
+            color = texture(uShadowMapPoint, vec4(lightDirection, uLight.light.shadowIndex)).rrr;
             break;
     }
+
+    // Tonemap and gamma correct
+    color = ACESFilm(color);
+    color = pow(color, vec3(1 / 2.2));
 
     oFragColor = vec4(color, 1);
 }

@@ -128,6 +128,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
         .addAttachmentSwapchain()
         .addAttachment("diffuse", VK_FORMAT_R8G8B8A8_UNORM)
         .addAttachment("normal", VK_FORMAT_R16G16B16A16_SFLOAT)
+        .addAttachment("occlusion_roughness_metallic", VK_FORMAT_R8G8B8A8_UNORM)
         .addAttachment("depth", depthFormat)
         .addSubpass("gbuffer_pass",
                     gfx::SubpassBuilder()
@@ -137,9 +138,13 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                                           gfx::VertexP3N3UV2::getAttributeDescriptions())
                     .addColorAttachment("diffuse", 0)
                     .addColorAttachment("normal", 1)
+                    .addColorAttachment("occlusion_roughness_metallic", 2)
                     .addDepthAttachment("depth")
                     .addUniformBufferDescriptor(0, 0, VK_SHADER_STAGE_VERTEX_BIT)
                     .addTextureDescriptor(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .addTextureDescriptor(1, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .addTextureDescriptor(1, 2, VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .addTextureDescriptor(1, 3, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build()
                    )
         .addSubpass("lighting_pass",
@@ -150,7 +155,8 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                     .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
                     .addInputAttachmentDescriptor(0, 0, "diffuse")
                     .addInputAttachmentDescriptor(0, 1, "normal")
-                    .addInputAttachmentDescriptor(0, 2, "depth")
+                    .addInputAttachmentDescriptor(0, 2, "occlusion_roughness_metallic")
+                    .addInputAttachmentDescriptor(0, 3, "depth")
                     .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addTextureDescriptor(1, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addTextureDescriptor(1, 2, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -451,6 +457,9 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                     const gfx::Material &mat = mesh.getMaterial();
                     gfx::DescriptorSet materialSet(lightingPass, subpassIdx, 1);
                     materialSet.setTexture(0, mat.getDiffuseTexture(), linearSampler_);
+                    materialSet.setTexture(1, mat.getOcclusionTexture(), linearSampler_);
+                    materialSet.setTexture(2, mat.getRoughnessTexture(), linearSampler_);
+                    materialSet.setTexture(3, mat.getMetallicTexture(), linearSampler_);
                     cmd.setDescriptorSet(device_, lightingPass, materialSet);
 
                     // Draw this mesh
@@ -472,7 +481,8 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                 gfx::DescriptorSet inputAttachmentsSet(lightingPass, subpassIdx, 0);
                 inputAttachmentsSet.setInputAttachment(0, "diffuse");
                 inputAttachmentsSet.setInputAttachment(1, "normal");
-                inputAttachmentsSet.setInputAttachment(2, "depth");
+                inputAttachmentsSet.setInputAttachment(2, "occlusion_roughness_metallic");
+                inputAttachmentsSet.setInputAttachment(3, "depth");
                 cmd.setDescriptorSet(device_, lightingPass, inputAttachmentsSet);
             }
 

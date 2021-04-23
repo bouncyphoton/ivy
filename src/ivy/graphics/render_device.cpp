@@ -232,7 +232,7 @@ RenderDevice::RenderDevice(const Options &options, const Platform &platform)
     descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
     Log::debug("Creating % descriptor pools with the following pool sizes:");
-    for (auto& poolSize : poolSizes) {
+    for (auto &poolSize : poolSizes) {
         Log::debug("- % %", poolSize.descriptorCount, vk_descriptor_type_to_string(poolSize.type));
     }
 
@@ -307,7 +307,7 @@ void RenderDevice::beginFrame() {
     //----------------------------------
 
     VK_CHECKF(vkAcquireNextImageKHR(device_, swapchain_, 1e9, imageAvailableSemaphores_.at(currentFrame_), VK_NULL_HANDLE,
-                          &swapImageIndex_));
+                                    &swapImageIndex_));
 
     //----------------------------------
     // Reset per-frame descriptor data
@@ -737,7 +737,7 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
             });
 
             framebuffers_.at(renderPass).emplace_back(Framebuffer(framebuffer, swapchainExtent_,
-                                                               attachmentViews, attachmentImages));
+                                                                  attachmentViews, attachmentImages));
         }
     }
 

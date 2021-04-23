@@ -10,15 +10,32 @@ class Texture;
  */
 class Material {
 public:
-    explicit Material(const Texture &diffuse_texture)
-        : diffuseTexture_(diffuse_texture) {}
+    explicit Material(const Texture &diffuse_texture, const Texture &occlusion_texture,
+                      const Texture &roughness_texture, const Texture &metallic_texture)
+        : diffuseTexture_(diffuse_texture), occlusionTexture_(occlusion_texture),
+          roughnessTexture_(roughness_texture), metallicTexture_(metallic_texture) {}
 
     [[nodiscard]] const Texture &getDiffuseTexture() const {
         return diffuseTexture_;
     }
 
+    [[nodiscard]] const Texture &getOcclusionTexture() const {
+        return occlusionTexture_;
+    }
+
+    [[nodiscard]] const Texture &getRoughnessTexture() const {
+        return roughnessTexture_;
+    }
+
+    [[nodiscard]] const Texture &getMetallicTexture() const {
+        return metallicTexture_;
+    }
+
 private:
     const Texture &diffuseTexture_;
+    const Texture &occlusionTexture_;
+    const Texture &roughnessTexture_;
+    const Texture &metallicTexture_;
 };
 
 }

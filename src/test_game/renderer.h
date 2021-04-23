@@ -44,8 +44,8 @@ private:
     ivy::u32 shadowSizeDirectional_ = 0;
     std::optional<ivy::gfx::Texture> directionalLightShadowAtlas_;
 
-    const ivy::u32 shadowMapSizePoint_ = 256;
-    const ivy::u32 maxShadowCastingPointLights_ = 16;
+    const ivy::u32 shadowMapSizePoint_ = 2048;
+    const ivy::u32 maxShadowCastingPointLights_ = 2;
     ivy::u32 numShadowsPoint_ = 0;
     std::optional<ivy::gfx::Texture> pointLightShadowAtlas_;
 };
