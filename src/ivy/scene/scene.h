@@ -125,7 +125,7 @@ public:
     /**
      * \brief If this bit is set, then the version is invalid
      */
-    static constexpr u32 VERSION_INVALID_BIT = 1 << 31;
+    static constexpr u32 VERSION_INVALID_BIT = 1u << 31;
 
 private:
     friend class EntityHandle;

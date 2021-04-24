@@ -238,7 +238,7 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
         u32 lastIndexCount = optimizedIndices.size();
         for (u32 i = 1; i < NUM_LOD; ++i) {
             // Half the number of indices each lod level
-            u32 targetIndices = optimizedIndices.size() * std::pow(0.5f, i);
+            u32 targetIndices = (u32)((f32)optimizedIndices.size() * std::pow(0.5f, i));
             f32 targetError = 1e-2f;
 
             std::vector<u32> lodIndices(optimizedIndices.size());

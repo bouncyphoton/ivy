@@ -223,7 +223,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
     // Point light shadow pass
     cmd.executeGraphicsPass(device_, shadowPassPoint, [&]() {
         cmd.bindGraphicsPipeline(shadowPassPoint, 0);
-        cmd.setViewport(0, 0, shadowMapSizePoint_, shadowMapSizePoint_);
+        cmd.setViewport(0, 0, (f32) shadowMapSizePoint_, (f32) shadowMapSizePoint_);
 
         std::vector<EntityHandle> lightEntities = scene.findEntitiesWithAllComponents<Transform, PointLight>();
         std::vector<EntityHandle> shadowCasters = scene.findEntitiesWithAllComponents<Transform, Model>();
@@ -525,7 +525,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                         perLight.shadowIndex = dirShadowIdx;
                         ++dirShadowIdx;
                     } else {
-                        perLight.shadowIndex = -1;
+                        perLight.shadowIndex = (u32) -1;
                     }
                 } else if (pntLight && transform) {
                     // TODO: better names for variables that are shared/interpreted differently depending on light type
@@ -538,7 +538,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                         perLight.shadowIndex = pntShadowIdx;
                         ++pntShadowIdx;
                     } else {
-                        perLight.shadowIndex = -1;
+                        perLight.shadowIndex = (u32)-1;
                     }
                 } else {
                     continue;

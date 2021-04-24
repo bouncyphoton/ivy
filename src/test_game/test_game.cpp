@@ -46,7 +46,7 @@ void TestGame::init() {
 
     // Add lights
     for (i32 i = 0; i < 2; ++i) {
-        f32 x = (i - 1) * 5;
+        f32 x = (i - 1) * 5.0f;
         f32 y = 2;
         f32 z = -5;
 

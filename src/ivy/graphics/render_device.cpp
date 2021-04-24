@@ -306,8 +306,8 @@ void RenderDevice::beginFrame() {
     // Get image from swapchain
     //----------------------------------
 
-    VK_CHECKF(vkAcquireNextImageKHR(device_, swapchain_, 1e9, imageAvailableSemaphores_.at(currentFrame_), VK_NULL_HANDLE,
-                                    &swapImageIndex_));
+    VK_CHECKF(vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX, imageAvailableSemaphores_.at(currentFrame_),
+                                    VK_NULL_HANDLE, &swapImageIndex_));
 
     //----------------------------------
     // Reset per-frame descriptor data

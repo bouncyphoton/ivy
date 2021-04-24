@@ -44,7 +44,7 @@ include_directories(SYSTEM external/stb)
 # Set compile options
 if (MSVC)
     # Treat warnings as errors
-    target_compile_options(ivy PRIVATE /W4 /WX)
+    target_compile_options(ivy PRIVATE /W3 /WX)
 
     target_compile_options(ivy PRIVATE /experimental:external /external:W0 /external:I ${VMA_SRC})
 else()
