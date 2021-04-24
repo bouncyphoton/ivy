@@ -131,16 +131,16 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
                           );
 
             vert.tangent = glm::vec3(
-                    mesh->mTangents[v].x,
-                    mesh->mTangents[v].y,
-                    mesh->mTangents[v].z
-            );
+                               mesh->mTangents[v].x,
+                               mesh->mTangents[v].y,
+                               mesh->mTangents[v].z
+                           );
 
             vert.bitangent = glm::vec3(
-                    mesh->mBitangents[v].x,
-                    mesh->mBitangents[v].y,
-                    mesh->mBitangents[v].z
-            );
+                                 mesh->mBitangents[v].x,
+                                 mesh->mBitangents[v].y,
+                                 mesh->mBitangents[v].z
+                             );
 
             vert.uv = glm::vec2(
                           mesh->mTextureCoords[0][v].x,

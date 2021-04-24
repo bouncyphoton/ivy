@@ -525,7 +525,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                         perLight.shadowIndex = dirShadowIdx;
                         ++dirShadowIdx;
                     } else {
-                        perLight.shadowIndex = (u32) -1;
+                        perLight.shadowIndex = (u32)(-1);
                     }
                 } else if (pntLight && transform) {
                     // TODO: better names for variables that are shared/interpreted differently depending on light type
@@ -538,7 +538,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
                         perLight.shadowIndex = pntShadowIdx;
                         ++pntShadowIdx;
                     } else {
-                        perLight.shadowIndex = (u32)-1;
+                        perLight.shadowIndex = (u32)(-1);
                     }
                 } else {
                     continue;

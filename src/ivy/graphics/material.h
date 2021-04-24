@@ -14,8 +14,8 @@ public:
                       const Texture &occlusion_texture, const Texture &roughness_texture,
                       const Texture &metallic_texture)
         : diffuseTexture_(diffuse_texture), normalTexture_(normal_texture),
-        occlusionTexture_(occlusion_texture), roughnessTexture_(roughness_texture),
-        metallicTexture_(metallic_texture) {}
+          occlusionTexture_(occlusion_texture), roughnessTexture_(roughness_texture),
+          metallicTexture_(metallic_texture) {}
 
     [[nodiscard]] const Texture &getDiffuseTexture() const {
         return diffuseTexture_;
