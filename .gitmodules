@@ -10,3 +10,12 @@
 [submodule "external/assimp"]
 	path = external/assimp
 	url = git@github.com:assimp/assimp.git
+[submodule "external/stb"]
+	path = external/stb
+	url = https://github.com/nothings/stb
+[submodule "external/meshoptimizer"]
+	path = external/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer.git
+[submodule "assets/models/glTF-Sample-Models"]
+	path = assets/models/glTF-Sample-Models
+	url = https://github.com/KhronosGroup/glTF-Sample-Models.git

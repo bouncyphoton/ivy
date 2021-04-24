@@ -26,6 +26,14 @@ void DescriptorSet::setUniformBuffer(u32 binding, const void *data, size_t size)
     uniformBufferInfos_.emplace_back(binding, offset, range);
 }
 
+void DescriptorSet::setTexture(u32 binding, const Texture &texture, VkSampler sampler) {
+    setTexture(binding, texture.getImageView(), sampler);
+}
+
+void DescriptorSet::setTexture(u32 binding, VkImageView view, VkSampler sampler) {
+    combinedImageSamplerInfos_.emplace_back(binding, view, sampler);
+}
+
 void DescriptorSet::validate() const {
     std::string errorMessage;
     std::set<u32> seenBindings;
@@ -40,7 +48,7 @@ void DescriptorSet::validate() const {
 
         if (validBindings.find(binding) == validBindings.end()) {
             // If this binding is not in the valid bindings set, that's an error
-            errorMessage += "\n- Binding " + std::to_string(binding) + " is invalid";
+            errorMessage += "\n- Binding " + std::to_string(binding) + " was not described in graphics pass";
         } else if (validBindings[binding] != type) {
             // If this binding has the incorrect descriptor type, that's an error
             errorMessage += "\n- Binding " + std::to_string(binding) + " should be of type " +
@@ -64,6 +72,11 @@ void DescriptorSet::validate() const {
     // Check buffer bindings
     for (const UniformBufferDescriptorInfo &info : uniformBufferInfos_) {
         validateBinding(info.binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    }
+
+    // Check combined image sampler bindings
+    for (const CombinedImageSamplerDescriptorInfo &info : combinedImageSamplerInfos_) {
+        validateBinding(info.binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     }
 
     // TODO: check other bindings when they get implemented

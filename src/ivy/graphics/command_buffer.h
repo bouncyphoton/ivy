@@ -36,8 +36,27 @@ public:
 
     void drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset, u32 first_instance);
 
+    void setViewport(f32 x, f32 y, f32 width, f32 height, f32 min_depth = 0.0f, f32 max_depth = 1.0f,
+                     bool flip_viewport = false);
+
+    // TODO: setScissor
+
     void copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, VkDeviceSize dst_offset = 0,
                     VkDeviceSize src_offset = 0);
+
+    void copyBufferToImage(VkBuffer src, VkImage dst, VkImageLayout dst_layout, VkImageAspectFlags image_aspect,
+                           u32 width, u32 height, u32 depth, u32 layers);
+
+    void copyImage(VkImage src, VkImageLayout src_layout, VkImage dst, VkImageLayout dst_layout, u32 num_regions,
+                   const VkImageCopy *regions);
+
+    void clearAttachments(u32 num_attachments, const VkClearAttachment *attachments, u32 num_rects,
+                          const VkClearRect *rects);
+
+    void pipelineBarrier(VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage, VkDependencyFlags dependency,
+                         u32 num_memory_barriers, const VkMemoryBarrier *memory_barriers,
+                         u32 num_buffer_memory_barriers, const VkBufferMemoryBarrier *buffer_memory_barriers,
+                         u32 num_image_memory_barriers, const VkImageMemoryBarrier *image_memory_barriers);
 
 private:
     VkCommandBuffer commandBuffer_;

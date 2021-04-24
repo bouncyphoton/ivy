@@ -6,19 +6,19 @@
 namespace ivy::gfx {
 
 /**
- * \brief A vertex with a position (3 components) and color (3 components)
+ * \brief A vertex with a position (3 components)
  */
-class VertexP3C3 {
+class VertexP3 {
 public:
-    VertexP3C3(glm::vec3 position, glm::vec3 color)
-        : position_(position), color_(color) {}
+    explicit VertexP3(glm::vec3 position = glm::vec3(0))
+        : position(position) {}
 
     static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
         std::vector<VkVertexInputBindingDescription> bindings;
 
         bindings.emplace_back();
         bindings.back().binding = 0;
-        bindings.back().stride = sizeof(VertexP3C3);
+        bindings.back().stride = sizeof(VertexP3);
         bindings.back().inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         return bindings;
@@ -27,26 +27,139 @@ public:
     static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
         std::vector<VkVertexInputAttributeDescription> attributes;
 
-        // pos
+        // position
         attributes.emplace_back();
         attributes.back().binding = 0;
         attributes.back().location = 0;
-        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributes.back().offset = offsetof(VertexP3C3, position_);
-
-        // color
-        attributes.emplace_back();
-        attributes.back().binding = 0;
-        attributes.back().location = 1;
-        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributes.back().offset = offsetof(VertexP3C3, color_);
+        attributes.back().format = VK_FORMAT_R32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3, position);
 
         return attributes;
     }
 
-private:
-    glm::vec3 position_;
-    glm::vec3 color_;
+    glm::vec3 position;
+};
+
+/**
+ * \brief A vertex with a position (3 components), a normal (3 components) and texture coordinates (2 components)
+ */
+class VertexP3N3UV2 {
+public:
+    explicit VertexP3N3UV2(glm::vec3 position = glm::vec3(0), glm::vec3 normal = glm::vec3(0, 1, 0),
+                           glm::vec2 uv = glm::vec2(0))
+        : position(position), normal(normal), uv(uv) {}
+
+    static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
+        std::vector<VkVertexInputBindingDescription> bindings;
+
+        bindings.emplace_back();
+        bindings.back().binding = 0;
+        bindings.back().stride = sizeof(VertexP3N3UV2);
+        bindings.back().inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return bindings;
+    }
+
+    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+        std::vector<VkVertexInputAttributeDescription> attributes;
+
+        // position
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 0;
+        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3UV2, position);
+
+        // normal
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 1;
+        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3UV2, normal);
+
+        // uv
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 2;
+        attributes.back().format = VK_FORMAT_R32G32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3UV2, uv);
+
+        return attributes;
+    }
+
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec2 uv;
+};
+
+/**
+* \brief A vertex with a position (3 components), a normal (3 components), a tangent (3 components),
+ * a bitangent (3 components), and texture coordinates (2 components)
+*/
+class VertexP3N3T3B3UV2 {
+public:
+    explicit VertexP3N3T3B3UV2(glm::vec3 position = glm::vec3(0), glm::vec3 normal = glm::vec3(0, 1, 0),
+                               glm::vec3 tangent = glm::vec3(1, 0, 0), glm::vec3 bitangent = glm::vec3(0, 0, 1),
+                               glm::vec2 uv = glm::vec2(0))
+        : position(position), normal(normal), tangent(tangent), bitangent(bitangent), uv(uv) {}
+
+    static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
+        std::vector<VkVertexInputBindingDescription> bindings;
+
+        bindings.emplace_back();
+        bindings.back().binding = 0;
+        bindings.back().stride = sizeof(VertexP3N3T3B3UV2);
+        bindings.back().inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return bindings;
+    }
+
+    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+        std::vector<VkVertexInputAttributeDescription> attributes;
+
+        // position
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 0;
+        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3T3B3UV2, position);
+
+        // normal
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 1;
+        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3T3B3UV2, normal);
+
+        // tangent
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 2;
+        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3T3B3UV2, tangent);
+
+        // bitangent
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 3;
+        attributes.back().format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3T3B3UV2, bitangent);
+
+        // uv
+        attributes.emplace_back();
+        attributes.back().binding = 0;
+        attributes.back().location = 4;
+        attributes.back().format = VK_FORMAT_R32G32_SFLOAT;
+        attributes.back().offset = offsetof(VertexP3N3T3B3UV2, uv);
+
+        return attributes;
+    }
+
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec3 tangent;
+    glm::vec3 bitangent;
+    glm::vec2 uv;
 };
 
 }

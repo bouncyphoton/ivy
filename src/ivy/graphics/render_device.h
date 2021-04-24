@@ -49,6 +49,12 @@ public:
     CommandBuffer getCommandBuffer();
 
     /**
+     * \brief Get graphics queue
+     * \return VkQueue
+     */
+    VkQueue getGraphicsQueue();
+
+    /**
      * \brief Get and submit a command buffer for recording one time commands (like a buffer copy)
      * \param queue The queue the command buffer should be submitted to
      * \param record_func A function that records commands into a command buffer
@@ -99,11 +105,13 @@ public:
      * \param subpass Subpass index
      * \param num_color_attachments The number of color attachments for the pipeline
      * \param has_depth_attachment Whether or not there is a depth attachment
+     * \param state State settings for graphics pipeline
      * \return VkPipeline
      */
     VkPipeline createGraphicsPipeline(const std::vector<Shader> &shaders, const VertexDescription &vertex_description,
                                       VkPipelineLayout layout, VkRenderPass render_pass, u32 subpass,
-                                      u32 num_color_attachments, bool has_depth_attachment);
+                                      u32 num_color_attachments, bool has_depth_attachment,
+                                      const GraphicsPipelineState &state);
 
     /**
      * \brief Get (or create if doesn't exist) the current swapchain framebuffer for a given graphics pass
@@ -127,6 +135,32 @@ public:
      * \return VkBuffer
      */
     VkBuffer createIndexBuffer(const void *data, VkDeviceSize size);
+
+    /**
+     * \brief Create an image on the GPU using given image data with the lifetime of the render device
+     * \param image_ci Image create info
+     * \param image_view_ci Image view create info
+     * \param data Pixel data
+     * \param size Size of pixel data in bytes
+     * \return VkImage and VkImageView pair
+     */
+    std::pair<VkImage, VkImageView> createTextureGPUFromData(VkImageCreateInfo image_ci,
+                                                             VkImageViewCreateInfo image_view_ci,
+                                                             const void *data, VkDeviceSize size);
+
+    /**
+     * \brief Create a sampler
+     * \param mag_filter Magnification filter
+     * \param min_filter Minification filter
+     * \param u_wrap Wrapping for u addressing
+     * \param v_wrap Wrapping for v addressing
+     * \param w_wrap Wrapping for w addressing
+     * \return VkSampler
+     */
+    VkSampler createSampler(VkFilter mag_filter, VkFilter min_filter,
+                            VkSamplerAddressMode u_wrap = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                            VkSamplerAddressMode v_wrap = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                            VkSamplerAddressMode w_wrap = VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
     /**
      * \brief Get a VkDescriptorSet with data specified in set for a graphics pass for the current frame
@@ -164,7 +198,15 @@ private:
      * \param usage How the buffer will be used
      * \return VkBuffer
      */
-    VkBuffer createBuffer(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
+    VkBuffer createBufferGPU(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
+
+    /**
+     * \brief Create a staging src buffer on the CPU, you need to destroy this yourself with vmaDestroyBuffer
+     * \param data Pointer to the data
+     * \param size Size of the buffer in bytes
+     * \return VkBuffer
+     */
+    std::pair<VkBuffer, VmaAllocation> createStagingBufferCPU(const void *data, VkDeviceSize size);
 
     const Options options_;
 
@@ -204,6 +246,7 @@ private:
 
     std::vector<VkDescriptorPool> pools_;
     std::vector<DescriptorSetCache> descriptorSetCaches_;
+    u32 maxSets_ = 4096;
 
     std::vector<VkBuffer> uniformBuffers_;
     std::vector<VkDeviceSize> uniformBufferOffsets_;

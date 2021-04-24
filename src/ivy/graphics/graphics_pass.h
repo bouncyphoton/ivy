@@ -3,6 +3,7 @@
 
 #include "ivy/types.h"
 #include "ivy/graphics/shader.h"
+#include "ivy/graphics/texture.h"
 #include "ivy/graphics/vertex_description.h"
 #include "ivy/graphics/descriptor_set.h"
 #include <vulkan/vulkan.h>
@@ -14,11 +15,30 @@
 namespace ivy::gfx {
 
 class RenderDevice;
+class Texture;
 
 // TODO: push constants
 
+/**
+ * \brief Describes the state of a graphics pipeline for a subpass
+ */
+struct GraphicsPipelineState {
+    bool depthTestEnable = true;
+    bool depthWriteEnable = true;
+    VkCompareOp depthCompareOp = VK_COMPARE_OP_LESS;
+
+    VkBlendOp colorBlendOp = VK_BLEND_OP_ADD;
+    VkBlendFactor srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    VkBlendFactor dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    VkBlendOp alphaBlendOp = VK_BLEND_OP_ADD;
+    VkBlendFactor srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    VkBlendFactor dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+
+    // TODO: add more state settings
+};
+
 // <set, <binding, VkDescriptorSetLayoutBinding>>
-using LayoutBindingsMap_t = std::unordered_map<u32, std::unordered_map<u32, VkDescriptorSetLayoutBinding>>;
+using LayoutBindingsMap_t = std::map<u32, std::map<u32, VkDescriptorSetLayoutBinding>>;
 
 /**
  * \brief Holds pipeline and set layouts for a subpass
@@ -81,6 +101,11 @@ private:
 struct AttachmentInfo {
     VkAttachmentDescription description;
     VkImageUsageFlags usage;
+
+    // TODO: remove attachment info and only use textures
+
+    // If a texture is the attachment, it's stored here
+    std::optional<Texture> texture;
 };
 
 /**
@@ -95,9 +120,10 @@ public:
 
     explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
                           const std::map<std::string, AttachmentInfo> &attachment_infos,
-                          const std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> &descriptorSetLayouts)
-        : renderPass_(render_pass), subpasses_(subpasses),
-          attachmentInfos_(attachment_infos), descriptorSetLayouts_(descriptorSetLayouts) {}
+                          const std::map<u32, std::map<u32, DescriptorSetLayout>> &descriptorSetLayouts,
+                          VkExtent2D extent, u32 num_layers)
+        : renderPass_(render_pass), subpasses_(subpasses), attachmentInfos_(attachment_infos),
+          descriptorSetLayouts_(descriptorSetLayouts), passExtent_(extent), numLayers_(num_layers) {}
 
     /**
      * \brief Get the VkRenderPass for this graphics pass
@@ -134,6 +160,22 @@ public:
         return descriptorSetLayouts_.at(subpass_index).at(set_index);
     }
 
+    /**
+     * \brief Get the width and height of the graphics pass
+     * \return VkExtent2D
+     */
+    [[nodiscard]] VkExtent2D getExtent() const {
+        return passExtent_;
+    }
+
+    /**
+     * \brief Get the number of layers for the framebuffer
+     * \return Number of layers
+     */
+    [[nodiscard]] u32 getNumLayers() const {
+        return numLayers_;
+    }
+
 private:
     // Friend so that they can access UnusedName
     friend class GraphicsPassBuilder;
@@ -147,7 +189,9 @@ private:
     VkRenderPass renderPass_;
     std::vector<Subpass> subpasses_;
     std::map<std::string, AttachmentInfo> attachmentInfos_;
-    std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
+    std::map<u32, std::map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
+    VkExtent2D passExtent_;
+    u32 numLayers_;
 };
 
 /**
@@ -165,6 +209,7 @@ private:
     std::optional<std::string> depthAttachmentName_;
 
     LayoutBindingsMap_t descriptors_;
+    GraphicsPipelineState pipelineState_;
 };
 
 /**
@@ -193,12 +238,30 @@ public:
 
     /**
      * \brief Add an input attachment to the subpass
+     * \param set Which descriptor set the descriptor should belong to
+     * \param binding Which binding in the descriptor set the descriptor should belong to
      * \param attachment_name Name of the attachment that should be an input
-     * \param set Which descriptor set the input attachment should belong to
-     * \param binding Which binding in the descriptor set the input attachment should belong to
      * \return SubpassBuilder
      */
-    SubpassBuilder &addInputAttachment(const std::string &attachment_name, u32 set, u32 binding);
+    SubpassBuilder &addInputAttachmentDescriptor(u32 set, u32 binding, const std::string &attachment_name);
+
+    /**
+     * \brief Add a uniform buffer to the subpass
+     * \param set Which descriptor set the descriptor should belong to
+     * \param binding Which binding in the descriptor set the descriptor should belong to
+     * \param stage_flags Which shader stage the descriptor set belongs to
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &addUniformBufferDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags);
+
+    /**
+     * \brief Add a texture to sample to the subpass
+     * \param set Which descriptor set the descriptor should belong to
+     * \param binding Which binding in the descriptor set the descriptor should belong to
+     * \param stage_flags Which shader stage the descriptor set belongs to
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &addTextureDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags);
 
     /**
      * \brief Add a color attachment to the subpass
@@ -216,6 +279,52 @@ public:
     SubpassBuilder &addDepthAttachment(const std::string &attachment_name);
 
     /**
+     * \brief Set the depth testing pipeline state
+     * \param depth_testing Whether or not depth testing should be enabled
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setDepthTesting(bool depth_testing);
+
+    /**
+     * \brief Set the depth writing pipeline state
+     * \param depth_writing Whether or not depth writing should be enabled
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setDepthWriting(bool depth_writing);
+
+    /**
+     * \brief Set the depth compare function
+     * \param compare_op Depth compare function
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setDepthCompareOp(VkCompareOp compare_op);
+
+    /**
+     * \brief Set the color blending options
+     * \param blend_op Color blend operation
+     * \param src_blend_factor Blending factor for src factors
+     * \param dst_blend_factor Blending factor for dst factors
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setColorBlending(VkBlendOp blend_op, VkBlendFactor src_blend_factor, VkBlendFactor dst_blend_factor);
+
+    /**
+     * \brief Sets the alpha blending options
+     * \param blend_op Alpha blend operation
+     * \param src_blend_factor Blending factor for src factors
+     * \param dst_blend_factor Blending factor for dst factors
+     * \return SubpassBuilder
+     */
+    SubpassBuilder &setAlphaBlending(VkBlendOp blend_op, VkBlendFactor src_blend_factor, VkBlendFactor dst_blend_factor);
+
+    /**
+     * \brief Build the subpass
+     * \return SubpassInfo
+     */
+    SubpassInfo build();
+
+private:
+    /**
      * \brief Add a descriptor to the subpass
      * \param set The descriptor set index
      * \param binding The binding in the descriptor set
@@ -225,13 +334,6 @@ public:
      */
     SubpassBuilder &addDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags, VkDescriptorType type);
 
-    /**
-     * \brief Build the subpass
-     * \return SubpassInfo
-     */
-    SubpassInfo build();
-
-private:
     SubpassInfo subpass_;
 };
 
@@ -240,16 +342,25 @@ private:
  */
 class GraphicsPassBuilder {
 public:
-    explicit GraphicsPassBuilder(RenderDevice &device)
-        : device_(device) {}
+    explicit GraphicsPassBuilder(RenderDevice &device);
+
+    /**
+     * \brief Add a texture to the graphics pass as an attachment
+     * \param attachment_name The name of the attachment
+     * \param texture The texture to attach
+     * \return GraphicsPassBuilder
+     */
+    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, const gfx::Texture &texture);
 
     /**
      * \brief Add an attachment to the graphics pass. Load and store ops as well as final layout are deduced from format
      * \param attachment_name The name of the attachment
      * \param format The format of the attachment
+     * \param additional_usage Additional usage flags to be OR'd with deduced usage flags
      * \return GraphicsPassBuilder
      */
-    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format);
+    GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format,
+                                       VkImageUsageFlags additional_usage = 0);
 
     /**
      * \brief Add an attachment to the graphics pass
@@ -261,12 +372,14 @@ public:
      * \param stencil_store_op The stencil store op for the attachment
      * \param initial_layout The initial layout for the attachment
      * \param final_layout The final layout for the attachment
+     * \param usage The usage flags for this attachment
      * \return GraphicsPassBuilder
      */
     GraphicsPassBuilder &addAttachment(const std::string &attachment_name, VkFormat format,
                                        VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
                                        VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op,
-                                       VkImageLayout initial_layout, VkImageLayout final_layout);
+                                       VkImageLayout initial_layout, VkImageLayout final_layout,
+                                       VkImageUsageFlags usage);
 
     /**
      * \brief Add an attachment to reference the swapchain
@@ -296,6 +409,12 @@ public:
                                               VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
                                               VkAccessFlags src_access_flags, VkAccessFlags dst_access_flags);
 
+    /**
+     * \brief Set the extent of the attachments in this graphics pass (if not set, this defaults to swapchain extent)
+     * \return GraphicsPassBuilder
+     */
+    GraphicsPassBuilder &setExtent(u32 width, u32 height);
+
     GraphicsPass build();
 private:
     struct DependencyInfo {
@@ -312,6 +431,7 @@ private:
     std::unordered_map<std::string, SubpassInfo> subpassInfos_;
     std::vector<std::string> subpassOrder_;
     std::vector<DependencyInfo> subpassDependencyInfo_;
+    VkExtent2D extent_;
 };
 
 }

@@ -2,6 +2,7 @@
 #define IVY_DESCRIPTOR_SET_H
 
 #include "ivy/types.h"
+#include "ivy/graphics/texture.h"
 #include <vulkan/vulkan.h>
 #include <string>
 #include <vector>
@@ -35,6 +36,15 @@ struct UniformBufferDescriptorInfo {
     u32 binding;
     u32 dataOffset;
     u32 dataRange;
+};
+
+struct CombinedImageSamplerDescriptorInfo {
+    CombinedImageSamplerDescriptorInfo(u32 binding, VkImageView view, VkSampler sampler)
+        : binding(binding), view(view), sampler(sampler) {}
+
+    u32 binding;
+    VkImageView view;
+    VkSampler sampler;
 };
 
 // TODO: allow already set parts of descriptor set to be updated
@@ -74,6 +84,22 @@ public:
     }
 
     /**
+     * \brief Set a 2D texture in the descriptor set
+     * \param binding The binding in the set for the texture
+     * \param texture The texture
+     * \param sampler The sampler
+     */
+    void setTexture(u32 binding, const Texture &texture, VkSampler sampler);
+
+    /**
+     * \brief Set a 2D texture in the descriptor set manually
+     * \param binding The binding in the set for the texture
+     * \param view The image view for the texture
+     * \param sampler The sampler for the texture
+     */
+    void setTexture(u32 binding, VkImageView view, VkSampler sampler);
+
+    /**
      * \brief Validate that everything was set properly
      */
     void validate() const;
@@ -111,6 +137,14 @@ public:
     }
 
     /**
+     * \brief Get the combined image sampler infos for this descriptor set
+     * \return Vector of CombinedImageSamplerDescriptorInfo
+     */
+    [[nodiscard]] const std::vector<CombinedImageSamplerDescriptorInfo> &getCombinedImageSamplerInfos() const {
+        return combinedImageSamplerInfos_;
+    }
+
+    /**
      * \brief Get the uniform buffer data
      * \return A vector of bytes with uniform buffer data
      */
@@ -124,6 +158,7 @@ private:
 
     std::vector<InputAttachmentDescriptorInfo> inputAttachmentInfos_;
     std::vector<UniformBufferDescriptorInfo> uniformBufferInfos_;
+    std::vector<CombinedImageSamplerDescriptorInfo> combinedImageSamplerInfos_;
     std::vector<u8> uniformBufferData_;
 };
 

@@ -13,8 +13,9 @@ namespace ivy::gfx {
  */
 class Framebuffer {
 public:
-    Framebuffer(VkFramebuffer framebuffer, VkExtent2D extent, const std::unordered_map<std::string, VkImageView> &views)
-        : framebuffer_(framebuffer), extent_(extent), views_(views) {}
+    Framebuffer(VkFramebuffer framebuffer, VkExtent2D extent, const std::unordered_map<std::string, VkImageView> &views,
+                const std::unordered_map<std::string, VkImage> &images)
+        : framebuffer_(framebuffer), extent_(extent), views_(views), images_(images) {}
 
     /**
      * \brief Get the underlying VkFramebuffer
@@ -33,17 +34,28 @@ public:
     }
 
     /**
-     * \brief Get an unordered map of VkImageViews with attachment names as keys
-     * \return unordered_map<(std::string) AttachmentName, VkImageVIew>
+     * \brief Get the image view for an attachment
+     * \param attachment_name Name of the attachment
+     * \return VkImageView
      */
-    [[nodiscard]] const std::unordered_map<std::string, VkImageView> &getViews() const {
-        return views_;
+    [[nodiscard]] VkImageView getView(const std::string &attachment_name) const {
+        return views_.at(attachment_name);
+    }
+
+    /**
+     * \brief Get the image for an attachment
+     * \param attachment_name Name of the attachment
+     * \return VkImage
+     */
+    [[nodiscard]] VkImage getImage(const std::string &attachment_name) const {
+        return images_.at(attachment_name);
     }
 
 private:
     VkFramebuffer framebuffer_;
     VkExtent2D extent_;
     std::unordered_map<std::string, VkImageView> views_;
+    std::unordered_map<std::string, VkImage> images_;
 };
 
 }

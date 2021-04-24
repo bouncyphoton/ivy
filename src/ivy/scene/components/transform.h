@@ -1,7 +1,7 @@
 #ifndef IVY_TRANSFORM_H
 #define IVY_TRANSFORM_H
 
-#include "ivy/entity/components/component.h"
+#include "ivy/scene/components/component.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -17,6 +17,10 @@ public:
                        glm::vec3 rotation = glm::vec3(0),
                        glm::vec3 scale = glm::vec3(1))
         : position_(position), rotation_(rotation), scale_(scale) {}
+
+    [[nodiscard]] std::string getName() const override {
+        return "Transform";
+    }
 
     [[nodiscard]] glm::mat4 getModelMatrix() const {
         return glm::translate(glm::mat4(1), position_) *

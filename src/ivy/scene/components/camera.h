@@ -1,7 +1,7 @@
 #ifndef IVY_CAMERA_H
 #define IVY_CAMERA_H
 
-#include "ivy/entity/components/component.h"
+#include "ivy/scene/components/component.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -15,6 +15,10 @@ class Camera : public Component {
 public:
     explicit Camera(f32 fov_y = glm::half_pi<f32>(), f32 near_plane = 0.1f, f32 far_plane = 100.0f)
         : fovY_(fov_y), nearPlane_(near_plane), farPlane_(far_plane) {}
+
+    [[nodiscard]] std::string getName() const override {
+        return "Camera";
+    }
 
     [[nodiscard]] f32 getFovY() const {
         return fovY_;

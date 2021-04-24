@@ -1,6 +1,7 @@
 #include "graphics_pass.h"
 #include "ivy/graphics/render_device.h"
 #include "ivy/graphics/vk_utils.h"
+#include "ivy/graphics/texture.h"
 #include "ivy/log.h"
 #include "ivy/consts.h"
 #include <unordered_set>
@@ -8,6 +9,9 @@
 namespace ivy::gfx {
 
 // TODO: would be cool to check shader bytecode to see if everything was referenced correctly
+
+GraphicsPassBuilder::GraphicsPassBuilder(RenderDevice &device)
+    : device_(device), extent_(device.getSwapchainExtent()) {}
 
 GraphicsPass GraphicsPassBuilder::build() {
     Log::debug("Building graphics pass");
@@ -25,6 +29,7 @@ GraphicsPass GraphicsPassBuilder::build() {
     // A set of unreferenced attachments for validation
     std::unordered_set<std::string> unreferencedAttachments;
 
+    u32 numLayers = 0;
     for (const auto &attachmentPair : attachments_) {
         const std::string &name = attachmentPair.first;
         const AttachmentInfo &info = attachmentPair.second;
@@ -33,6 +38,22 @@ GraphicsPass GraphicsPassBuilder::build() {
         attachmentLocations[name] = attachmentDescriptions.size();
         attachmentDescriptions.emplace_back(info.description);
         unreferencedAttachments.emplace(name);
+
+        // Validate that all attachments have the same number of layers
+        u32 currentLayers = attachmentPair.second.texture ? attachmentPair.second.texture->getLayers() : 1;
+        if (currentLayers != numLayers) {
+            if (numLayers == 0) {
+                numLayers = currentLayers;
+            } else {
+                Log::fatal("Graphics pass contains attachments with different numbers of layers: "
+                           "Attachment '%' has % layers which is different from %", name, currentLayers, numLayers);
+            }
+        }
+    }
+
+    // No custom attachments which means all attachments have 1 layer
+    if (numLayers == 0) {
+        numLayers = 1;
     }
 
     //--------------------------------------
@@ -87,9 +108,6 @@ GraphicsPass GraphicsPassBuilder::build() {
             reference.attachment = attachmentLocations[colorAttachmentName];
             reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-            // Set the usage for this attachment
-            attachments_[colorAttachmentName].usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
             // Add it to the list of color attachments for this subpass
             colorAttachmentReferences[subpassName].emplace_back(reference);
         }
@@ -111,9 +129,6 @@ GraphicsPass GraphicsPassBuilder::build() {
             VkAttachmentReference reference = {};
             reference.attachment = attachmentLocations[depthAttachmentName];
             reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-            // Set the usage for this attachment
-            attachments_[depthAttachmentName].usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
             // Add it to the list of depth attachments for this subpass
             depthAttachmentReferences[subpassName] = reference;
@@ -224,7 +239,7 @@ GraphicsPass GraphicsPassBuilder::build() {
     std::vector<Subpass> subpasses;
 
     // A table of DescriptorSetLayouts for the final GraphicsPass, <subpass, set, layout>
-    std::unordered_map<u32, std::unordered_map<u32, DescriptorSetLayout>> descriptorSetLayouts;
+    std::map<u32, std::map<u32, DescriptorSetLayout>> descriptorSetLayouts;
 
     // Go over each subpass
     for (u32 subpassIdx = 0; subpassIdx < subpassOrder_.size(); ++subpassIdx) {
@@ -237,7 +252,7 @@ GraphicsPass GraphicsPassBuilder::build() {
         // Create DescriptorSetLayouts for GraphicsPass
         for (const auto &descriptorSet : subpassInfo.descriptors_) {
             u32 setIdx = descriptorSet.first;
-            const std::unordered_map<u32, VkDescriptorSetLayoutBinding> &bindings = descriptorSet.second;
+            const std::map<u32, VkDescriptorSetLayoutBinding> &bindings = descriptorSet.second;
 
             // Turn bindings map into a vector
             std::vector<VkDescriptorSetLayoutBinding> bindingsVector;
@@ -263,8 +278,9 @@ GraphicsPass GraphicsPassBuilder::build() {
         // Create pipeline
         subpasses.emplace_back(
             device_.createGraphicsPipeline(
-                subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass, subpasses.size(),
-                subpassInfo.colorAttachmentNames_.size(), subpassInfo.depthAttachmentName_.has_value()
+                subpassInfo.shaders_, subpassInfo.vertexDescription_, layout.pipelineLayout, renderPass,
+                subpasses.size(), subpassInfo.colorAttachmentNames_.size(), subpassInfo.depthAttachmentName_.has_value(),
+                subpassInfo.pipelineState_
             ),
             layout,
             subpass_name
@@ -272,10 +288,18 @@ GraphicsPass GraphicsPassBuilder::build() {
     }
 
     // Create the graphics pass
-    return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts);
+    return GraphicsPass(renderPass, subpasses, attachments_, descriptorSetLayouts, extent_, numLayers);
 }
 
-GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format) {
+GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name,
+                                                        const gfx::Texture &texture) {
+    addAttachment(attachment_name, texture.getFormat());
+    attachments_[attachment_name].texture = texture;
+    return *this;
+}
+
+GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,
+                                                        VkImageUsageFlags additional_usage) {
     bool separateDepthStencilLayoutsEnabled = false;
     bool isDepth = format >= VK_FORMAT_D16_UNORM && format <= VK_FORMAT_D32_SFLOAT_S8_UINT && format != VK_FORMAT_S8_UINT;
     bool isStencil = format >= VK_FORMAT_S8_UINT && format <= VK_FORMAT_D32_SFLOAT_S8_UINT;
@@ -286,24 +310,30 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attac
     VkAttachmentStoreOp stencil_store_op = isStencil ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageLayout final_layout;
+    VkImageUsageFlags usage = 0;
     if ((isDepth && isStencil) || (isDepth && !separateDepthStencilLayoutsEnabled)) {
         final_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     } else if (isDepth && separateDepthStencilLayoutsEnabled) {
         final_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     } else if (isStencil) {
         final_layout = VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL;
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     } else {
         final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     }
 
     return addAttachment(attachment_name, format, load_op, store_op, stencil_load_op, stencil_store_op,
-                         initial_layout, final_layout);
+                         initial_layout, final_layout, usage | additional_usage);
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attachment_name, VkFormat format,
                                                         VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
                                                         VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op,
-                                                        VkImageLayout initial_layout, VkImageLayout final_layout) {
+                                                        VkImageLayout initial_layout, VkImageLayout final_layout,
+                                                        VkImageUsageFlags usage) {
     if constexpr (consts::DEBUG) {
         if (attachments_.find(attachment_name) != attachments_.end()) {
             Log::fatal("Attachment '%' was added multiple times to the same graphics pass!", attachment_name);
@@ -324,13 +354,14 @@ GraphicsPassBuilder &GraphicsPassBuilder::addAttachment(const std::string &attac
     attachment.finalLayout = final_layout;
 
     attachments_[attachment_name].description = attachment;
+    attachments_[attachment_name].usage = usage;
     return *this;
 }
 
 GraphicsPassBuilder &GraphicsPassBuilder::addAttachmentSwapchain() {
     addAttachment(GraphicsPass::SwapchainName, device_.getSwapchainFormat(), VK_ATTACHMENT_LOAD_OP_CLEAR,
                   VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+                  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     return *this;
 }
 
@@ -365,6 +396,12 @@ GraphicsPassBuilder &GraphicsPassBuilder::addSubpassDependency(const std::string
     return *this;
 }
 
+GraphicsPassBuilder &GraphicsPassBuilder::setExtent(u32 width, u32 height) {
+    extent_.width = width;
+    extent_.height = height;
+    return *this;
+}
+
 SubpassBuilder &SubpassBuilder::addShader(Shader::StageEnum shader_stage, const std::string &shader_path) {
     subpass_.shaders_.emplace_back(shader_stage, shader_path);
     return *this;
@@ -376,9 +413,19 @@ SubpassBuilder &SubpassBuilder::addVertexDescription(const std::vector<VkVertexI
     return *this;
 }
 
-SubpassBuilder &SubpassBuilder::addInputAttachment(const std::string &attachment_name, u32 set, u32 binding) {
+SubpassBuilder &SubpassBuilder::addInputAttachmentDescriptor(u32 set, u32 binding, const std::string &attachment_name) {
     subpass_.inputAttachmentNames_.emplace_back(attachment_name);
     addDescriptor(set, binding, VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::addUniformBufferDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags) {
+    addDescriptor(set, binding, stage_flags, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::addTextureDescriptor(u32 set, u32 binding, VkShaderStageFlags stage_flags) {
+    addDescriptor(set, binding, stage_flags, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     return *this;
 }
 
@@ -406,6 +453,37 @@ SubpassBuilder &SubpassBuilder::addDepthAttachment(const std::string &attachment
 
     subpass_.depthAttachmentName_ = attachment_name;
 
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setDepthTesting(bool depth_testing) {
+    subpass_.pipelineState_.depthTestEnable = depth_testing;
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setDepthWriting(bool depth_writing) {
+    subpass_.pipelineState_.depthWriteEnable = depth_writing;
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setDepthCompareOp(VkCompareOp compare_op) {
+    subpass_.pipelineState_.depthCompareOp = compare_op;
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setColorBlending(VkBlendOp blend_op, VkBlendFactor src_blend_factor,
+                                                 VkBlendFactor dst_blend_factor) {
+    subpass_.pipelineState_.colorBlendOp = blend_op;
+    subpass_.pipelineState_.srcColorBlendFactor = src_blend_factor;
+    subpass_.pipelineState_.dstColorBlendFactor = dst_blend_factor;
+    return *this;
+}
+
+SubpassBuilder &SubpassBuilder::setAlphaBlending(VkBlendOp blend_op, VkBlendFactor src_blend_factor,
+                                                 VkBlendFactor dst_blend_factor) {
+    subpass_.pipelineState_.alphaBlendOp = blend_op;
+    subpass_.pipelineState_.srcAlphaBlendFactor = src_blend_factor;
+    subpass_.pipelineState_.dstAlphaBlendFactor = dst_blend_factor;
     return *this;
 }
 

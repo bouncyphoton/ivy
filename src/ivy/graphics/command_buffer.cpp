@@ -21,7 +21,7 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     renderPassBeginInfo.renderPass = pass.getVkRenderPass();
     renderPassBeginInfo.framebuffer = framebuffer.getVkFramebuffer();
     renderPassBeginInfo.renderArea.offset = {0, 0};
-    renderPassBeginInfo.renderArea.extent = framebuffer.getExtent();
+    renderPassBeginInfo.renderArea.extent = pass.getExtent();
 
     // Generate clear values for each attachment
     std::vector<VkClearValue> clearValues;
@@ -42,18 +42,19 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     renderPassBeginInfo.clearValueCount = clearValues.size();
     renderPassBeginInfo.pClearValues = clearValues.data();
 
-    // Flip the viewport upside down
-    VkViewport viewport = {};
-    viewport.width = (f32) renderPassBeginInfo.renderArea.extent.width;
-    viewport.height = -1.0f * (f32) renderPassBeginInfo.renderArea.extent.height;
-    viewport.x = (f32) renderPassBeginInfo.renderArea.offset.x;
-    viewport.y = (f32) renderPassBeginInfo.renderArea.offset.y + (f32) renderPassBeginInfo.renderArea.extent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = renderPassBeginInfo.renderArea.extent;
 
     // Start render pass, call user functions, end render pass
     vkCmdBeginRenderPass(commandBuffer_, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdSetViewport(commandBuffer_, 0, 1, &viewport);
+
+    // Set viewport (flipped upside down)
+    setViewport((f32) renderPassBeginInfo.renderArea.offset.x, (f32) renderPassBeginInfo.renderArea.offset.y,
+                (f32) renderPassBeginInfo.renderArea.extent.width, (f32) renderPassBeginInfo.renderArea.extent.height,
+                0.0f, 1.0f, true);
+
+    vkCmdSetScissor(commandBuffer_, 0, 1, &scissor);
     func();
     vkCmdEndRenderPass(commandBuffer_);
 }
@@ -93,6 +94,27 @@ void CommandBuffer::drawIndexed(u32 num_indices, u32 num_instances, u32 first_in
     vkCmdDrawIndexed(commandBuffer_, num_indices, num_instances, first_index, vertex_offset, first_instance);
 }
 
+void CommandBuffer::setViewport(f32 x, f32 y, f32 width, f32 height, f32 min_depth, f32 max_depth, bool flip_viewport) {
+    VkViewport viewport = {};
+    if (flip_viewport) {
+        viewport.width = width;
+        viewport.height = -1.0f * height;
+        viewport.x = x;
+        viewport.y = y + height;
+        viewport.minDepth = min_depth;
+        viewport.maxDepth = max_depth;
+    } else {
+        viewport.width = width;
+        viewport.height = height;
+        viewport.x = x;
+        viewport.y = y;
+        viewport.minDepth = min_depth;
+        viewport.maxDepth = max_depth;
+    }
+
+    vkCmdSetViewport(commandBuffer_, 0, 1, &viewport);
+}
+
 void CommandBuffer::copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, VkDeviceSize dst_offset,
                                VkDeviceSize src_offset) {
     VkBufferCopy region = {};
@@ -101,6 +123,38 @@ void CommandBuffer::copyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size, Vk
     region.srcOffset = src_offset;
 
     vkCmdCopyBuffer(commandBuffer_, src, dst, 1, &region);
+}
+
+void CommandBuffer::copyBufferToImage(VkBuffer src, VkImage dst, VkImageLayout dst_layout,
+                                      VkImageAspectFlags image_aspect, u32 width, u32 height, u32 depth, u32 layers) {
+    VkBufferImageCopy region = {};
+    region.imageSubresource.aspectMask = image_aspect;
+    region.imageSubresource.layerCount = layers;
+    region.imageExtent = {width, height, depth};
+
+    vkCmdCopyBufferToImage(commandBuffer_, src, dst, dst_layout, 1, &region);
+}
+
+void CommandBuffer::copyImage(VkImage src, VkImageLayout src_layout, VkImage dst, VkImageLayout dst_layout,
+                              u32 num_regions, const VkImageCopy *regions) {
+    vkCmdCopyImage(commandBuffer_, src, src_layout, dst, dst_layout, num_regions, regions);
+}
+
+void CommandBuffer::clearAttachments(u32 num_attachments, const VkClearAttachment *attachments, u32 num_rects,
+                                     const VkClearRect *rects) {
+    vkCmdClearAttachments(commandBuffer_, num_attachments, attachments, num_rects, rects);
+}
+
+void CommandBuffer::pipelineBarrier(VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage,
+                                    VkDependencyFlags dependency, u32 num_memory_barriers,
+                                    const VkMemoryBarrier *memory_barriers, u32 num_buffer_memory_barriers,
+                                    const VkBufferMemoryBarrier *buffer_memory_barriers,
+                                    u32 num_image_memory_barriers,
+                                    const VkImageMemoryBarrier *image_memory_barriers) {
+    vkCmdPipelineBarrier(commandBuffer_, src_stage, dst_stage, dependency,
+                         num_memory_barriers, memory_barriers,
+                         num_buffer_memory_barriers, buffer_memory_barriers,
+                         num_image_memory_barriers, image_memory_barriers);
 }
 
 }
