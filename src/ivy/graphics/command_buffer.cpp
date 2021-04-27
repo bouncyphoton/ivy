@@ -4,12 +4,16 @@
 
 namespace ivy::gfx {
 
-void CommandBuffer::bindGraphicsPipeline(VkPipeline pipeline) {
-    vkCmdBindPipeline(commandBuffer_, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+void CommandBuffer::bindPipeline(VkPipeline pipeline, VkPipelineBindPoint bind_point) {
+    vkCmdBindPipeline(commandBuffer_, bind_point, pipeline);
 }
 
 void CommandBuffer::bindGraphicsPipeline(const GraphicsPass &pass, u32 subpass) {
-    bindGraphicsPipeline(pass.getSubpass(subpass).getPipeline());
+    bindPipeline(pass.getSubpass(subpass).getPipeline(), VK_PIPELINE_BIND_POINT_GRAPHICS);
+}
+
+void CommandBuffer::bindComputePipeline(const ComputePass &pass) {
+    bindPipeline(pass.getPipeline(), VK_PIPELINE_BIND_POINT_COMPUTE);
 }
 
 void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass &pass,
@@ -59,6 +63,11 @@ void CommandBuffer::executeGraphicsPass(RenderDevice &device, const GraphicsPass
     vkCmdEndRenderPass(commandBuffer_);
 }
 
+void CommandBuffer::executeComputePass(const ComputePass &pass, const std::function<void()> &func) {
+    bindComputePipeline(pass);
+    func();
+}
+
 void CommandBuffer::nextSubpass() {
     vkCmdNextSubpass(commandBuffer_, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -72,6 +81,17 @@ void CommandBuffer::setDescriptorSet(RenderDevice &device, const GraphicsPass &p
 
     vkCmdBindDescriptorSets(commandBuffer_, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             pass.getSubpass(set.getSubpassIndex()).getPipelineLayout(), set.getSetIndex(),
+                            1, &vkSet, 0, nullptr);
+}
+
+void CommandBuffer::setDescriptorSet(RenderDevice &device, const ComputePass &pass, const DescriptorSet &set) {
+    if (consts::DEBUG) {
+        set.validate();
+    }
+
+    VkDescriptorSet vkSet = device.getVkDescriptorSet(pass, set);
+
+    vkCmdBindDescriptorSets(commandBuffer_, VK_PIPELINE_BIND_POINT_COMPUTE, pass.getPipelineLayout(), set.getSetIndex(),
                             1, &vkSet, 0, nullptr);
 }
 
@@ -92,6 +112,10 @@ void CommandBuffer::draw(u32 num_vertices, u32 num_instances, u32 first_vertex, 
 void CommandBuffer::drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset,
                                 u32 first_instance) {
     vkCmdDrawIndexed(commandBuffer_, num_indices, num_instances, first_index, vertex_offset, first_instance);
+}
+
+void CommandBuffer::dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
+    vkCmdDispatch(commandBuffer_, num_groups_x, num_groups_y, num_groups_z);
 }
 
 void CommandBuffer::setViewport(f32 x, f32 y, f32 width, f32 height, f32 min_depth, f32 max_depth, bool flip_viewport) {

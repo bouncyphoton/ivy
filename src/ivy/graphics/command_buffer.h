@@ -4,6 +4,7 @@
 #include "ivy/types.h"
 #include "ivy/graphics/framebuffer.h"
 #include "ivy/graphics/graphics_pass.h"
+#include "ivy/graphics/compute_pass.h"
 #include "ivy/graphics/descriptor_set.h"
 #include <vulkan/vulkan.h>
 #include <functional>
@@ -18,15 +19,33 @@ public:
     explicit CommandBuffer(VkCommandBuffer command_buffer)
         : commandBuffer_(command_buffer) {}
 
-    void bindGraphicsPipeline(VkPipeline pipeline);
+    void bindPipeline(VkPipeline pipeline, VkPipelineBindPoint bind_point);
 
     void bindGraphicsPipeline(const GraphicsPass &pass, u32 subpass);
 
+    void bindComputePipeline(const ComputePass &pass);
+
+    /**
+     * \brief Starts the render pass with clear values and correct framebuffer, sets a flipped viewport and
+     * scissor region, runs func and ends the render pass. NOTE: this does not bind any pipelines
+     * \param device The render device
+     * \param pass The graphics pass to execute
+     * \param func The function to call after starting the render pass
+     */
     void executeGraphicsPass(RenderDevice &device, const GraphicsPass &pass, const std::function<void()> &func);
+
+    /**
+     * \brief Binds the compute pipeline and runs func
+     * \param pass The compute pass
+     * \param func The function to run after binding compute pipeline
+     */
+    void executeComputePass(const ComputePass &pass, const std::function<void()> &func);
 
     void nextSubpass();
 
     void setDescriptorSet(RenderDevice &device, const GraphicsPass &pass, const DescriptorSet &set);
+
+    void setDescriptorSet(RenderDevice &device, const ComputePass &pass, const DescriptorSet &set);
 
     void bindVertexBuffer(VkBuffer buffer);
 
@@ -35,6 +54,8 @@ public:
     void draw(u32 num_vertices, u32 num_instances, u32 first_vertex, u32 first_instance);
 
     void drawIndexed(u32 num_indices, u32 num_instances, u32 first_index, u32 vertex_offset, u32 first_instance);
+
+    void dispatch(u32 num_groups_x, u32 num_groups_y = 1, u32 num_groups_z = 1);
 
     void setViewport(f32 x, f32 y, f32 width, f32 height, f32 min_depth = 0.0f, f32 max_depth = 1.0f,
                      bool flip_viewport = false);

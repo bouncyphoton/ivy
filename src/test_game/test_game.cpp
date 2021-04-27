@@ -14,7 +14,7 @@
 using namespace ivy;
 
 TestGame::TestGame()
-    : engine_(getOptions()), renderer_(engine_.getRenderDevice()) {
+    : engine_(getOptions()), rendererRaster_(engine_.getRenderDevice()), rendererRT_(engine_.getRenderDevice()) {
 
     // Set logging level
     Log::logLevel = Log::LogLevel::DEBUG;
@@ -91,19 +91,19 @@ void TestGame::update() {
 
     // Set debug render mode
     if (input.isKeyPressed(GLFW_KEY_1)) {
-        debugMode_ = Renderer::DebugMode::FULL;
+        debugMode_ = RendererRaster::DebugMode::FULL;
         Log::debug("Rendering with full shading");
     } else if (input.isKeyPressed(GLFW_KEY_2)) {
-        debugMode_ = Renderer::DebugMode::DIFFUSE;
+        debugMode_ = RendererRaster::DebugMode::DIFFUSE;
         Log::debug("Rendering diffuse gbuffer");
     }  else if (input.isKeyPressed(GLFW_KEY_3)) {
-        debugMode_ = Renderer::DebugMode::NORMAL;
+        debugMode_ = RendererRaster::DebugMode::NORMAL;
         Log::debug("Rendering normal gbuffer");
     }  else if (input.isKeyPressed(GLFW_KEY_4)) {
-        debugMode_ = Renderer::DebugMode::OCCLUSION_ROUGHNESS_METALLIC;
+        debugMode_ = RendererRaster::DebugMode::OCCLUSION_ROUGHNESS_METALLIC;
         Log::debug("Rendering derived world position");
     }  else if (input.isKeyPressed(GLFW_KEY_5)) {
-        debugMode_ = Renderer::DebugMode::SHADOW_MAP;
+        debugMode_ = RendererRaster::DebugMode::SHADOW_MAP;
         Log::debug("Rendering shadow map");
     }
 
@@ -193,15 +193,16 @@ void TestGame::update() {
 }
 
 void TestGame::render() {
-    renderer_.render(scene_, debugMode_);
+    //        rendererRaster_.render(scene_, debugMode_);
+    rendererRT_.render(scene_);
 }
 
 Options TestGame::getOptions() {
     Options options;
 
-    options.appName = "Vulkan Deferred Rendering Demo | ivy engine";
-    options.renderWidth = 1600;
-    options.renderHeight = 900;
+    options.appName = "ivy engine";
+    options.renderWidth = 800;
+    options.renderHeight = 600;
 
     return options;
 }

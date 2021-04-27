@@ -11,15 +11,7 @@
 namespace ivy::gfx {
 
 class GraphicsPass;
-
-struct DescriptorSetLayout {
-    DescriptorSetLayout(u32 subpass_index, u32 set_index, const std::vector<VkDescriptorSetLayoutBinding> &bindings)
-        : subpassIndex(subpass_index), setIndex(set_index), bindings(bindings) {}
-
-    u32 subpassIndex;
-    u32 setIndex;
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-};
+class ComputePass;
 
 struct InputAttachmentDescriptorInfo {
     InputAttachmentDescriptorInfo(u32 binding, const std::string &attachment_name)
@@ -47,6 +39,14 @@ struct CombinedImageSamplerDescriptorInfo {
     VkSampler sampler;
 };
 
+struct StorageImageSamplerDescriptorInfo {
+    StorageImageSamplerDescriptorInfo(u32 binding, VkImageView view)
+        : binding(binding), view(view) {}
+
+    u32 binding;
+    VkImageView view;
+};
+
 // TODO: allow already set parts of descriptor set to be updated
 // TODO: array descriptors
 
@@ -56,6 +56,8 @@ struct CombinedImageSamplerDescriptorInfo {
 class DescriptorSet {
 public:
     DescriptorSet(const GraphicsPass &pass, u32 subpass_index, u32 set_index);
+
+    DescriptorSet(const ComputePass &pass, u32 set_index);
 
     /**
      * \brief Set an input attachment in the descriptor set
@@ -92,12 +94,26 @@ public:
     void setTexture(u32 binding, const Texture &texture, VkSampler sampler);
 
     /**
-     * \brief Set a 2D texture in the descriptor set manually
+     * \brief Set a 2D texture in the descriptor set
      * \param binding The binding in the set for the texture
      * \param view The image view for the texture
      * \param sampler The sampler for the texture
      */
     void setTexture(u32 binding, VkImageView view, VkSampler sampler);
+
+    /**
+     * \brief Set a storage image in the descriptor set
+     * \param binding The binding in the set for the storage image
+     * \param texture The texture
+     */
+    void setStorageImage(u32 binding, const Texture &texture);
+
+    /**
+     * \brief Set a storage image in the descriptor set
+     * \param binding The binding in the set for the storage image
+     * \param view The image view
+     */
+    void setStorageImage(u32 binding, VkImageView view);
 
     /**
      * \brief Validate that everything was set properly
@@ -109,7 +125,7 @@ public:
      * \return Subpass index
      */
     [[nodiscard]] u32 getSubpassIndex() const {
-        return layout_.subpassIndex;
+        return subpassIndex_;
     }
 
     /**
@@ -117,7 +133,7 @@ public:
      * \return Set index
      */
     [[nodiscard]] u32 getSetIndex() const {
-        return layout_.setIndex;
+        return setIndex_;
     }
 
     /**
@@ -145,6 +161,14 @@ public:
     }
 
     /**
+     * \brief Get the storage image sampler infos for this descriptor set
+     * \return Vector of StorageImageSamplerDescriptorInfo
+     */
+    [[nodiscard]] const std::vector<StorageImageSamplerDescriptorInfo> &getStorageImageSamplerInfos() const {
+        return storageImageSamplerInfos_;
+    }
+
+    /**
      * \brief Get the uniform buffer data
      * \return A vector of bytes with uniform buffer data
      */
@@ -153,12 +177,14 @@ public:
     }
 
 private:
-    std::string subpassName_;
-    DescriptorSetLayout layout_;
+    u32 subpassIndex_;
+    u32 setIndex_;
+    const std::vector<VkDescriptorSetLayoutBinding> &bindings_;
 
     std::vector<InputAttachmentDescriptorInfo> inputAttachmentInfos_;
     std::vector<UniformBufferDescriptorInfo> uniformBufferInfos_;
     std::vector<CombinedImageSamplerDescriptorInfo> combinedImageSamplerInfos_;
+    std::vector<StorageImageSamplerDescriptorInfo> storageImageSamplerInfos_;
     std::vector<u8> uniformBufferData_;
 };
 

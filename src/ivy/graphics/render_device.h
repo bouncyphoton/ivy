@@ -114,6 +114,14 @@ public:
                                       const GraphicsPipelineState &state);
 
     /**
+     * \brief Create a compute pipeline
+     * \param shader The compute shader
+     * \param layout Pipeline layout
+     * \return VkPipeline
+     */
+    VkPipeline createComputePipeline(const Shader &shader, VkPipelineLayout layout);
+
+    /**
      * \brief Get (or create if doesn't exist) the current swapchain framebuffer for a given graphics pass
      * \param pass The graphics pass for the framebuffer to get
      * \return Framebuffer for graphics pass (for this frame)
@@ -171,6 +179,14 @@ public:
     VkDescriptorSet getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set);
 
     /**
+     * \brief Get a VkDescriptorSet with data specified in set for a compute pass for the current frame
+     * \param pass The associated compute pass
+     * \param set The set
+     * \return VkDescriptorSet ready for binding
+     */
+    VkDescriptorSet getVkDescriptorSet(const ComputePass &pass, const DescriptorSet &set);
+
+    /**
      * \brief From a list, get the first format that is supported by the device with given features
      * \param formats List of formats to check
      * \param feature The feature flag bits to check
@@ -207,6 +223,16 @@ private:
      * \return VkBuffer
      */
     std::pair<VkBuffer, VmaAllocation> createStagingBufferCPU(const void *data, VkDeviceSize size);
+
+    /**
+     * \brief Get a VkDescriptorSet with data specified in set for a compute pass for the current frame
+     * \param set_layout The set layout
+     * \param set The descriptor set
+     * \param framebuffer Framebuffer if applicable
+     * \return VkDescriptorSet
+     */
+    VkDescriptorSet getVkDescriptorSet(VkDescriptorSetLayout set_layout, const DescriptorSet &set,
+                                       const Framebuffer *framebuffer);
 
     const Options options_;
 

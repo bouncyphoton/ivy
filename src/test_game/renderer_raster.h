@@ -1,5 +1,5 @@
-#ifndef IVY_RENDERER_H
-#define IVY_RENDERER_H
+#ifndef IVY_RENDERER_RASTER_H
+#define IVY_RENDERER_RASTER_H
 
 #include "ivy/types.h"
 #include "ivy/graphics/render_device.h"
@@ -10,9 +10,9 @@
 #include "ivy/scene/scene.h"
 
 /**
- * \brief High level renderer
+ * \brief High level rasterized renderer
  */
-class Renderer final {
+class RendererRaster final {
 public:
     /**
      * \brief Debug rendering mode
@@ -21,8 +21,8 @@ public:
         FULL, DIFFUSE, NORMAL, OCCLUSION_ROUGHNESS_METALLIC, SHADOW_MAP
     };
 
-    explicit Renderer(ivy::gfx::RenderDevice &render_device);
-    ~Renderer();
+    explicit RendererRaster(ivy::gfx::RenderDevice &render_device);
+    ~RendererRaster();
 
     /**
      * \brief Render a frame
@@ -50,4 +50,4 @@ private:
     std::optional<ivy::gfx::Texture> pointLightShadowAtlas_;
 };
 
-#endif // IVY_RENDERER_H
+#endif // IVY_RENDERER_RASTER_H

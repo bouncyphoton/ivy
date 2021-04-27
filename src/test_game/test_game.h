@@ -2,7 +2,8 @@
 #define IVY_TEST_GAME_H
 
 #include "ivy/engine.h"
-#include "renderer.h"
+#include "renderer_raster.h"
+#include "renderer_rt.h"
 #include <vector>
 
 class TestGame {
@@ -19,10 +20,11 @@ private:
     static ivy::Options getOptions();
 
     ivy::Engine engine_;
-    Renderer renderer_;
+    RendererRaster rendererRaster_;
+    RendererRT rendererRT_;
     ivy::Scene scene_;
 
-    Renderer::DebugMode debugMode_ = Renderer::DebugMode::FULL;
+    RendererRaster::DebugMode debugMode_ = RendererRaster::DebugMode::FULL;
 };
 
 #endif // IVY_TEST_GAME_H

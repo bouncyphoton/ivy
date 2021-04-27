@@ -6,6 +6,10 @@ layout (input_attachment_index = 1, set = 0, binding = 1) uniform subpassInput i
 layout (input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput iOcclusionRoughnessMetallic;
 layout (input_attachment_index = 3, set = 0, binding = 3) uniform subpassInput iDepth;
 
+layout (location = 0) in VertexData {
+    vec2 uv;
+} FS_IN;
+
 layout (location = 0) out vec4 oFragColor;
 
 layout (set = 1, binding = 0) uniform PerFrame {
@@ -44,7 +48,7 @@ void main() {
     float metallic = subpassLoad(iOcclusionRoughnessMetallic).b;
 
     // Derived variables
-    vec2 uv       = vec2(gl_FragCoord.x, uFrame.resolution.y - gl_FragCoord.y) / uFrame.resolution;
+    vec2 uv       = FS_IN.uv;
     vec3 worldPos = depthToWorldPos(uv, depth, uFrame.invProjection, uFrame.invView);
     vec3 viewPos  = uFrame.invView[3].xyz;
     vec3 viewDir  = normalize(worldPos - viewPos);

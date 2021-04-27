@@ -120,10 +120,10 @@ public:
 
     explicit GraphicsPass(VkRenderPass render_pass, const std::vector<Subpass> &subpasses,
                           const std::map<std::string, AttachmentInfo> &attachment_infos,
-                          const std::map<u32, std::map<u32, DescriptorSetLayout>> &descriptorSetLayouts,
+                          const std::map<u32, std::map<u32, std::vector<VkDescriptorSetLayoutBinding>>> &descriptor_set_layouts,
                           VkExtent2D extent, u32 num_layers)
         : renderPass_(render_pass), subpasses_(subpasses), attachmentInfos_(attachment_infos),
-          descriptorSetLayouts_(descriptorSetLayouts), passExtent_(extent), numLayers_(num_layers) {}
+          descriptorSetLayouts_(descriptor_set_layouts), passExtent_(extent), numLayers_(num_layers) {}
 
     /**
      * \brief Get the VkRenderPass for this graphics pass
@@ -151,12 +151,13 @@ public:
     }
 
     /**
-     * \brief Get the descriptor set layout for a given subpass and set
+     * \brief Get the descriptor set layout bindings for a given subpass and set
      * \param subpass_index The subpass
      * \param set_index The set in the subpass
-     * \return DescriptorSetLayout
+     * \return std::vector<VkDescriptorSetLayoutBinding>
      */
-    [[nodiscard]] const DescriptorSetLayout &getDescriptorSetLayout(u32 subpass_index, u32 set_index) const {
+    [[nodiscard]] const std::vector<VkDescriptorSetLayoutBinding> &getDescriptorSetLayoutBindings(u32 subpass_index,
+                                                                                                  u32 set_index) const {
         return descriptorSetLayouts_.at(subpass_index).at(set_index);
     }
 
@@ -189,7 +190,7 @@ private:
     VkRenderPass renderPass_;
     std::vector<Subpass> subpasses_;
     std::map<std::string, AttachmentInfo> attachmentInfos_;
-    std::map<u32, std::map<u32, DescriptorSetLayout>> descriptorSetLayouts_;
+    std::map<u32, std::map<u32, std::vector<VkDescriptorSetLayoutBinding>>> descriptorSetLayouts_;
     VkExtent2D passExtent_;
     u32 numLayers_;
 };

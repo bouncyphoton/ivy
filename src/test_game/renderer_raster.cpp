@@ -1,4 +1,4 @@
-#include "renderer.h"
+#include "renderer_raster.h"
 #include "ivy/log.h"
 #include "ivy/graphics/vertex.h"
 #include "ivy/scene/components/transform.h"
@@ -6,8 +6,6 @@
 #include "ivy/scene/components/camera.h"
 #include "ivy/scene/components/light.h"
 #include <glm/gtc/matrix_transform.hpp>
-
-// TODO: compute pass
 
 using namespace ivy;
 
@@ -51,7 +49,7 @@ struct PerLightLightingPass {
     alignas(4) u32 shadowIndex;
 };
 
-Renderer::Renderer(gfx::RenderDevice &render_device)
+RendererRaster::RendererRaster(gfx::RenderDevice &render_device)
     : device_(render_device) {
     LOG_CHECKPOINT();
 
@@ -150,7 +148,7 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
                    )
         .addSubpass("lighting_pass",
                     gfx::SubpassBuilder()
-                    .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/lighting.vert.spv")
+                    .addShader(gfx::Shader::StageEnum::VERTEX, "../assets/shaders/fullscreen.vert.spv")
                     .addShader(gfx::Shader::StageEnum::FRAGMENT, "../assets/shaders/lighting.frag.spv")
                     .setColorBlending(VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE)
                     .addColorAttachment(gfx::GraphicsPass::SwapchainName, 0)
@@ -178,11 +176,11 @@ Renderer::Renderer(gfx::RenderDevice &render_device)
     );
 }
 
-Renderer::~Renderer() {
+RendererRaster::~RendererRaster() {
     LOG_CHECKPOINT();
 }
 
-void Renderer::render(Scene &scene, DebugMode debug_mode) {
+void RendererRaster::render(Scene &scene, DebugMode debug_mode) {
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
     gfx::GraphicsPass &shadowPassDirectional = passes_.at(0);
@@ -563,7 +561,7 @@ void Renderer::render(Scene &scene, DebugMode debug_mode) {
     device_.endFrame();
 }
 
-glm::vec4 Renderer::getShadowViewport(ivy::u32 shadow_idx) const {
+glm::vec4 RendererRaster::getShadowViewport(ivy::u32 shadow_idx) const {
     return glm::vec4(
                (shadow_idx % shadowsPerSideDirectional_) * shadowSizeDirectional_,
                (shadow_idx / shadowsPerSideDirectional_) * shadowSizeDirectional_,

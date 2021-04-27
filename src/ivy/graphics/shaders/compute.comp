@@ -1,0 +1,12 @@
+#version 450
+layout (local_size_x = 1, local_size_y = 1) in;
+
+layout (binding = 0, rgba8) uniform writeonly image2D uImage;
+
+void main() {
+    ivec2 resolution = imageSize(uImage);
+    vec2 uv = vec2(gl_GlobalInvocationID.xy) / resolution;
+    vec3 color = vec3(uv, 1.0);
+
+    imageStore(uImage, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
+}

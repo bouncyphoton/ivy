@@ -8,7 +8,7 @@ The goal is to create a Vulkan renderer frontend that is easy to use and hard to
 
 ### Example code
 
-Below is example code for a simple deferred renderer. For a full working example [look here](src/test_game/renderer.cpp) 
+Below is example code for a simple deferred renderer. For a full working example [look here](src/test_game/renderer_raster.cpp) 
 
 **Renderer initialization code**
 ```c++
@@ -104,7 +104,7 @@ cmd.executeGraphicsPass(device_, pass, [&]() {
     // Subpass 0, g-buffer
     {
         // Bind graphics pipeline
-        cmd.bindGraphicsPipeline(pass, subpassIdx);
+        cmd.bindPipeline(pass, subpassIdx);
 
         // Set MVP data on CPU
         struct MVP {
@@ -129,7 +129,7 @@ cmd.executeGraphicsPass(device_, pass, [&]() {
         cmd.nextSubpass();
 
         // Bind graphics pipeline
-        cmd.bindGraphicsPipeline(pass, subpassIdx);
+        cmd.bindPipeline(pass, subpassIdx);
 
         // Set our input attachments in descriptor set and bind it
         gfx::DescriptorSet inputAttachmentsSet(pass, subpassIdx, 0);

@@ -1,6 +1,7 @@
 #include "descriptor_set.h"
 #include "ivy/log.h"
 #include "ivy/graphics/graphics_pass.h"
+#include "ivy/graphics/compute_pass.h"
 #include "ivy/graphics/vk_utils.h"
 #include <set>
 #include <unordered_map>
@@ -8,9 +9,15 @@
 
 namespace ivy::gfx {
 
+// TODO: theres a lot of repetitive code, can be generalized
+
 DescriptorSet::DescriptorSet(const GraphicsPass &pass, u32 subpass_index, u32 set_index)
-    : subpassName_(pass.getSubpass(subpass_index).getName()),
-      layout_(pass.getDescriptorSetLayout(subpass_index, set_index)) {
+    : subpassIndex_(subpass_index), setIndex_(set_index),
+      bindings_(pass.getDescriptorSetLayoutBindings(subpass_index, set_index)) {
+}
+
+DescriptorSet::DescriptorSet(const ComputePass &pass, u32 set_index)
+    : subpassIndex_(0), setIndex_(set_index), bindings_(pass.getDescriptorSetLayoutBindings(set_index)) {
 }
 
 void DescriptorSet::setInputAttachment(u32 binding, const std::string &attachment_name) {
@@ -32,6 +39,14 @@ void DescriptorSet::setTexture(u32 binding, const Texture &texture, VkSampler sa
 
 void DescriptorSet::setTexture(u32 binding, VkImageView view, VkSampler sampler) {
     combinedImageSamplerInfos_.emplace_back(binding, view, sampler);
+}
+
+void DescriptorSet::setStorageImage(u32 binding, const Texture &texture) {
+    setStorageImage(binding, texture.getImageView());
+}
+
+void DescriptorSet::setStorageImage(u32 binding, VkImageView view) {
+    storageImageSamplerInfos_.emplace_back(binding, view);
 }
 
 void DescriptorSet::validate() const {
@@ -60,7 +75,7 @@ void DescriptorSet::validate() const {
     };
 
     // Store valid bindings for easy look up
-    for (const VkDescriptorSetLayoutBinding &binding : layout_.bindings) {
+    for (const VkDescriptorSetLayoutBinding &binding : bindings_) {
         validBindings[binding.binding] = binding.descriptorType;
     }
 
@@ -77,6 +92,11 @@ void DescriptorSet::validate() const {
     // Check combined image sampler bindings
     for (const CombinedImageSamplerDescriptorInfo &info : combinedImageSamplerInfos_) {
         validateBinding(info.binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    }
+
+    // Check storage images
+    for (const StorageImageSamplerDescriptorInfo &info : storageImageSamplerInfos_) {
+        validateBinding(info.binding, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
     }
 
     // TODO: check other bindings when they get implemented
@@ -96,8 +116,7 @@ void DescriptorSet::validate() const {
     }
 
     if (!errorMessage.empty()) {
-        Log::fatal("Descriptor set % for subpass % (%) is invalid: %", layout_.setIndex, layout_.subpassIndex,
-                   subpassName_, errorMessage);
+        Log::fatal("Descriptor set % in pass % is invalid: %", setIndex_, subpassIndex_, errorMessage);
     }
 }
 

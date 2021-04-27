@@ -239,7 +239,7 @@ GraphicsPass GraphicsPassBuilder::build() {
     std::vector<Subpass> subpasses;
 
     // A table of DescriptorSetLayouts for the final GraphicsPass, <subpass, set, layout>
-    std::map<u32, std::map<u32, DescriptorSetLayout>> descriptorSetLayouts;
+    std::map<u32, std::map<u32, std::vector<VkDescriptorSetLayoutBinding>>> descriptorSetLayouts;
 
     // Go over each subpass
     for (u32 subpassIdx = 0; subpassIdx < subpassOrder_.size(); ++subpassIdx) {
@@ -262,7 +262,7 @@ GraphicsPass GraphicsPassBuilder::build() {
             }
 
             // Store descriptor set layout
-            descriptorSetLayouts[subpassIdx].emplace(setIdx, DescriptorSetLayout(subpassIdx, setIdx, bindingsVector));
+            descriptorSetLayouts[subpassIdx].emplace(setIdx, bindingsVector);
 
             // Debug logging
             Log::debug("    - set % has % bindings", setIdx, bindings.size());

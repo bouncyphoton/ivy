@@ -623,6 +623,30 @@ VkPipeline RenderDevice::createGraphicsPipeline(const std::vector<Shader> &shade
     return graphicsPipeline;
 }
 
+VkPipeline RenderDevice::createComputePipeline(const Shader &shader, VkPipelineLayout layout) {
+    VkPipelineShaderStageCreateInfo shaderStage = {};
+    shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStage.stage = shader.getStage();
+    shaderStage.module = loadShader(device_, shader.getShaderPath());
+    shaderStage.pName = "main";
+
+    VkComputePipelineCreateInfo ci = {};
+    ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    ci.stage = shaderStage;
+    ci.layout = layout;
+    ci.basePipelineIndex = -1;
+
+    VkPipeline computePipeline;
+    VK_CHECKF(vkCreateComputePipelines(device_, VK_NULL_HANDLE, 1, &ci, nullptr, &computePipeline));
+    cleanupStack_.emplace([ = ]() {
+        vkDestroyPipeline(device_, computePipeline, nullptr);
+    });
+
+    vkDestroyShaderModule(device_, shaderStage.module, nullptr);
+
+    return computePipeline;
+}
+
 Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
     VkRenderPass renderPass = pass.getVkRenderPass();
     const std::map<std::string, AttachmentInfo> &attachmentInfos = pass.getAttachmentInfos();
@@ -874,140 +898,14 @@ VkSampler RenderDevice::createSampler(VkFilter mag_filter, VkFilter min_filter, 
 }
 
 VkDescriptorSet RenderDevice::getVkDescriptorSet(const GraphicsPass &pass, const DescriptorSet &set) {
-    DescriptorSetCache &cache = descriptorSetCaches_.at(swapImageIndex_);
     u32 subpassIdx = set.getSubpassIndex();
     u32 setIdx = set.getSetIndex();
+    return getVkDescriptorSet(pass.getSubpass(subpassIdx).getSetLayout(setIdx), set, &getFramebuffer(pass));
+}
 
-    // Get the layout for this set in this subpass
-    VkDescriptorSetLayout layout = pass.getSubpass(subpassIdx).getSetLayout(setIdx);
-
-    // See if the cache can give us an unused descriptor set with the same layout
-    VkDescriptorSet dstSet = cache.findSetWithLayout(layout);
-
-    if (!dstSet) {
-        // We didn't find a descriptor set with the right layout, we need to allocate a new one
-        VkDescriptorSetAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = pools_.at(swapImageIndex_);
-        allocInfo.descriptorSetCount = 1;
-        allocInfo.pSetLayouts = &layout;
-
-        Log::verbose("Allocating new descriptor set for frame %, subpass %, set %", swapImageIndex_, subpassIdx, setIdx);
-
-        // TODO: handle case where we can't allocate new descriptor set
-        VK_CHECKF(vkAllocateDescriptorSets(device_, &allocInfo, &dstSet));
-
-        // Add it to the cache so we can find it next time we need a descriptor set with this layout
-        cache.addToCache(layout, dstSet);
-    }
-
-    // We don't cache by data yet, so we always write to the descriptor set
-    // TODO: cache by descriptor set data to prevent unnecessary updates
-
-    Framebuffer &framebuffer = getFramebuffer(pass);
-    std::vector<VkWriteDescriptorSet> writes;
-
-    //----------------------------------
-    // Input attachments
-    //----------------------------------
-
-    std::vector<VkDescriptorImageInfo> imageInfos;
-    imageInfos.reserve(set.getInputAttachmentInfos().size() + set.getCombinedImageSamplerInfos().size());
-
-    for (const InputAttachmentDescriptorInfo &desc : set.getInputAttachmentInfos()) {
-        VkDescriptorImageInfo imageInfo = {};
-        imageInfo.sampler = VK_NULL_HANDLE;
-        imageInfo.imageView = framebuffer.getView(desc.attachmentName);
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfos.emplace_back(imageInfo);
-
-        VkWriteDescriptorSet write = {};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = dstSet;
-        write.dstBinding = desc.binding;
-        write.descriptorCount = 1;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        write.pImageInfo = &imageInfos.back();
-        writes.emplace_back(write);
-    }
-
-    //----------------------------------
-    // Uniform buffers
-    //----------------------------------
-
-    std::vector<VkDescriptorBufferInfo> bufferInfos;
-    bufferInfos.reserve(set.getUniformBufferInfos().size());
-
-    const u8 *srcPtr = set.getUniformBufferData().data();
-    u8 *dstPtr = reinterpret_cast<u8 *>(uniformBufferMappedPointers_.at(swapImageIndex_));
-
-    VkDeviceSize &dstOffset = uniformBufferOffsets_.at(swapImageIndex_);
-    u32 minAlignment = (u32) limits_.minUniformBufferOffsetAlignment;
-
-    // Create descriptor writes that reference uniform buffer data
-    VkBuffer buffer = uniformBuffers_.at(swapImageIndex_);
-    for (const UniformBufferDescriptorInfo &info : set.getUniformBufferInfos()) {
-        if (dstOffset + info.dataRange > uniformBufferSize_) {
-            Log::fatal("This uniform buffer for descriptor set % in subpass % will overrun the buffer! "
-                       "Too much data was set via uniform buffers this frame.",
-                       set.getSetIndex(), set.getSubpassIndex());
-        }
-
-        // Copy data into buffer
-        std::memcpy(dstPtr + dstOffset, srcPtr + info.dataOffset, info.dataRange);
-
-        // Set buffer info
-        VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = buffer;
-        bufferInfo.offset = dstOffset;
-        bufferInfo.range = info.dataRange;
-        bufferInfos.emplace_back(bufferInfo);
-
-        // Add to dstOffset, taking alignment into account
-        dstOffset += info.dataRange;
-        if (dstOffset % minAlignment != 0) {
-            dstOffset += minAlignment - (dstOffset % minAlignment);
-        }
-
-        VkWriteDescriptorSet write = {};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = dstSet;
-        write.dstBinding = info.binding;
-        write.descriptorCount = 1;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write.pBufferInfo = &bufferInfos.back();
-
-        writes.emplace_back(write);
-    }
-
-    //----------------------------------
-    // Combined image samplers
-    //----------------------------------
-
-    for (const CombinedImageSamplerDescriptorInfo &info : set.getCombinedImageSamplerInfos()) {
-        VkDescriptorImageInfo imageInfo = {};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = info.view;
-        imageInfo.sampler = info.sampler;
-        imageInfos.emplace_back(imageInfo);
-
-        VkWriteDescriptorSet write = {};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = dstSet;
-        write.dstBinding = info.binding;
-        write.descriptorCount = 1;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        write.pImageInfo = &imageInfos.back();
-
-        writes.emplace_back(write);
-    }
-
-    // TODO: support other descriptor types
-
-    // Write to descriptor set
-    vkUpdateDescriptorSets(device_, writes.size(), writes.data(), 0, nullptr);
-
-    return dstSet;
+VkDescriptorSet RenderDevice::getVkDescriptorSet(const ComputePass &pass, const DescriptorSet &set) {
+    u32 setIdx = set.getSetIndex();
+    return getVkDescriptorSet(pass.getSetLayout(setIdx), set, nullptr);
 }
 
 VkFormat RenderDevice::getFirstSupportedFormat(const std::vector<VkFormat> &formats,
@@ -1359,6 +1257,163 @@ std::pair<VkBuffer, VmaAllocation> RenderDevice::createStagingBufferCPU(const vo
     memcpy(stagingAllocInfo.pMappedData, data, static_cast<size_t>(size));
 
     return { stagingBuffer, stagingAllocation };
+}
+
+VkDescriptorSet RenderDevice::getVkDescriptorSet(VkDescriptorSetLayout set_layout, const DescriptorSet &set,
+                                                 const Framebuffer *framebuffer) {
+    DescriptorSetCache &cache = descriptorSetCaches_.at(swapImageIndex_);
+    u32 subpassIdx = set.getSubpassIndex();
+    u32 setIdx = set.getSetIndex();
+
+    // See if the cache can give us an unused descriptor set with the same layout
+    VkDescriptorSet dstSet = cache.findSetWithLayout(set_layout);
+
+    if (!dstSet) {
+        // We didn't find a descriptor set with the right layout, we need to allocate a new one
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = pools_.at(swapImageIndex_);
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &set_layout;
+
+        Log::verbose("Allocating new descriptor set for frame %, subpass %, set %", swapImageIndex_, subpassIdx, setIdx);
+
+        // TODO: handle case where we can't allocate new descriptor set
+        VK_CHECKF(vkAllocateDescriptorSets(device_, &allocInfo, &dstSet));
+
+        // Add it to the cache so we can find it next time we need a descriptor set with this layout
+        cache.addToCache(set_layout, dstSet);
+    }
+
+    // We don't cache by data yet, so we always write to the descriptor set
+    // TODO: cache by descriptor set data to prevent unnecessary updates
+
+    std::vector<VkWriteDescriptorSet> writes;
+
+    //----------------------------------
+    // Input attachments
+    //----------------------------------
+
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    imageInfos.reserve(set.getInputAttachmentInfos().size() + set.getCombinedImageSamplerInfos().size());
+
+    if (framebuffer) {
+        for (const InputAttachmentDescriptorInfo &desc : set.getInputAttachmentInfos()) {
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.sampler = VK_NULL_HANDLE;
+            imageInfo.imageView = framebuffer->getView(desc.attachmentName);
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfos.emplace_back(imageInfo);
+
+            VkWriteDescriptorSet write = {};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = dstSet;
+            write.dstBinding = desc.binding;
+            write.descriptorCount = 1;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+            write.pImageInfo = &imageInfos.back();
+            writes.emplace_back(write);
+        }
+    }
+
+    //----------------------------------
+    // Uniform buffers
+    //----------------------------------
+
+    std::vector<VkDescriptorBufferInfo> bufferInfos;
+    bufferInfos.reserve(set.getUniformBufferInfos().size());
+
+    const u8 *srcPtr = set.getUniformBufferData().data();
+    u8 *dstPtr = reinterpret_cast<u8 *>(uniformBufferMappedPointers_.at(swapImageIndex_));
+
+    VkDeviceSize &dstOffset = uniformBufferOffsets_.at(swapImageIndex_);
+    u32 minAlignment = (u32) limits_.minUniformBufferOffsetAlignment;
+
+    // Create descriptor writes that reference uniform buffer data
+    VkBuffer buffer = uniformBuffers_.at(swapImageIndex_);
+    for (const UniformBufferDescriptorInfo &info : set.getUniformBufferInfos()) {
+        if (dstOffset + info.dataRange > uniformBufferSize_) {
+            Log::fatal("This uniform buffer for descriptor set % in subpass % will overrun the buffer! "
+                       "Too much data was set via uniform buffers this frame.",
+                       set.getSetIndex(), set.getSubpassIndex());
+        }
+
+        // Copy data into buffer
+        std::memcpy(dstPtr + dstOffset, srcPtr + info.dataOffset, info.dataRange);
+
+        // Set buffer info
+        VkDescriptorBufferInfo bufferInfo = {};
+        bufferInfo.buffer = buffer;
+        bufferInfo.offset = dstOffset;
+        bufferInfo.range = info.dataRange;
+        bufferInfos.emplace_back(bufferInfo);
+
+        // Add to dstOffset, taking alignment into account
+        dstOffset += info.dataRange;
+        if (dstOffset % minAlignment != 0) {
+            dstOffset += minAlignment - (dstOffset % minAlignment);
+        }
+
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = dstSet;
+        write.dstBinding = info.binding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.pBufferInfo = &bufferInfos.back();
+
+        writes.emplace_back(write);
+    }
+
+    //----------------------------------
+    // Combined image samplers
+    //----------------------------------
+
+    for (const CombinedImageSamplerDescriptorInfo &info : set.getCombinedImageSamplerInfos()) {
+        VkDescriptorImageInfo imageInfo = {};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = info.view;
+        imageInfo.sampler = info.sampler;
+        imageInfos.emplace_back(imageInfo);
+
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = dstSet;
+        write.dstBinding = info.binding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.pImageInfo = &imageInfos.back();
+
+        writes.emplace_back(write);
+    }
+
+    //----------------------------------
+    // Storage image
+    //----------------------------------
+
+    for (const StorageImageSamplerDescriptorInfo &info : set.getStorageImageSamplerInfos()) {
+        VkDescriptorImageInfo imageInfo = {};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        imageInfo.imageView = info.view;
+        imageInfos.emplace_back(imageInfo);
+
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = dstSet;
+        write.dstBinding = info.binding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        write.pImageInfo = &imageInfos.back();
+
+        writes.emplace_back(write);
+    }
+
+    // TODO: support other descriptor types
+
+    // Write to descriptor set
+    vkUpdateDescriptorSets(device_, writes.size(), writes.data(), 0, nullptr);
+
+    return dstSet;
 }
 
 }
