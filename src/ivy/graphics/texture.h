@@ -31,6 +31,10 @@ public:
         return imageCI_.arrayLayers;
     }
 
+    [[nodiscard]] u32 getLevels() const {
+        return imageCI_.mipLevels;
+    }
+
     [[nodiscard]] VkImageViewType getViewType() const {
         return viewCI_.viewType;
     }

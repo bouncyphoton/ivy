@@ -39,22 +39,18 @@ void RendererRT::render(Scene &scene) {
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
 
-    // Undefined/shader read layout -> general
-    {
-        VkImageMemoryBarrier memoryBarrier = {};
-        memoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        memoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        memoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-        memoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        memoryBarrier.image = texture_->getImage();
-        memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        memoryBarrier.subresourceRange.levelCount = 1;
-        memoryBarrier.subresourceRange.layerCount = 1;
-
-        cmd.pipelineBarrier(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                            0, 0, nullptr, 0, nullptr, 1, &memoryBarrier);
-    }
+    // Transition for writing
+    cmd.transitionImage(*texture_,
+                        // layout
+                        VK_IMAGE_LAYOUT_UNDEFINED,
+                        VK_IMAGE_LAYOUT_GENERAL,
+                        // stage
+                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        // access
+                        VK_ACCESS_SHADER_READ_BIT,
+                        VK_ACCESS_SHADER_WRITE_BIT
+                       );
 
     // Ray trace compute shader
     cmd.executeComputePass(*rtPass_, [&]() {
@@ -65,22 +61,18 @@ void RendererRT::render(Scene &scene) {
         cmd.dispatch(texture_->getExtent().width, texture_->getExtent().height);
     });
 
-    // Compute write -> fragment read
-    {
-        VkImageMemoryBarrier memoryBarrier = {};
-        memoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        memoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-        memoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        memoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        memoryBarrier.image = texture_->getImage();
-        memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        memoryBarrier.subresourceRange.levelCount = 1;
-        memoryBarrier.subresourceRange.layerCount = 1;
-
-        cmd.pipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                            0, 0, nullptr, 0, nullptr, 1, &memoryBarrier);
-    }
+    // Transition for reading from shader
+    cmd.transitionImage(*texture_,
+                        // layout
+                        VK_IMAGE_LAYOUT_GENERAL,
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                        // stage
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                        // access
+                        VK_ACCESS_SHADER_WRITE_BIT,
+                        VK_ACCESS_SHADER_READ_BIT
+                       );
 
     // Process image for present
     cmd.executeGraphicsPass(device_, *presentPass_, [&]() {

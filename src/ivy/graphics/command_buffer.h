@@ -79,6 +79,9 @@ public:
                          u32 num_buffer_memory_barriers, const VkBufferMemoryBarrier *buffer_memory_barriers,
                          u32 num_image_memory_barriers, const VkImageMemoryBarrier *image_memory_barriers);
 
+    void transitionImage(const Texture &texture, VkImageLayout old_layout, VkImageLayout new_layout,
+                         VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage, VkAccessFlags src_access, VkAccessFlags dst_access);
+
 private:
     VkCommandBuffer commandBuffer_;
 };

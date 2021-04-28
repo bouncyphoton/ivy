@@ -193,7 +193,7 @@ void TestGame::update() {
 }
 
 void TestGame::render() {
-    //        rendererRaster_.render(scene_, debugMode_);
+    // rendererRaster_.render(scene_, debugMode_);
     rendererRT_.render(scene_);
 }
 

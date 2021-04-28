@@ -181,4 +181,20 @@ void CommandBuffer::pipelineBarrier(VkPipelineStageFlags src_stage, VkPipelineSt
                          num_image_memory_barriers, image_memory_barriers);
 }
 
+void CommandBuffer::transitionImage(const Texture &texture, VkImageLayout old_layout, VkImageLayout new_layout,
+                                    VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage, VkAccessFlags src_access, VkAccessFlags dst_access) {
+    VkImageMemoryBarrier memoryBarrier = {};
+    memoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    memoryBarrier.oldLayout = old_layout;
+    memoryBarrier.newLayout = new_layout;
+    memoryBarrier.srcAccessMask = src_access;
+    memoryBarrier.dstAccessMask = dst_access;
+    memoryBarrier.image = texture.getImage();
+    memoryBarrier.subresourceRange.aspectMask = texture.getImageAspect();
+    memoryBarrier.subresourceRange.levelCount = texture.getLevels();
+    memoryBarrier.subresourceRange.layerCount = texture.getLayers();
+
+    pipelineBarrier(src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1, &memoryBarrier);
+}
+
 }
