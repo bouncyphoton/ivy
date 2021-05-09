@@ -54,7 +54,11 @@ public:
 
     ComputePassBuilder &setShader(const std::string &shader_path);
 
+    ComputePassBuilder &addStorageBufferDescriptor(u32 set, u32 binding);
+
     ComputePassBuilder &addStorageImageDescriptor(u32 set, u32 binding);
+
+    ComputePassBuilder &addUniformBufferDescriptor(u32 set, u32 binding);
 
     ComputePass build();
 

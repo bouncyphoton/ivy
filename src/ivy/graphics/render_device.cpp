@@ -768,20 +768,47 @@ Framebuffer &RenderDevice::getFramebuffer(const GraphicsPass &pass) {
     return framebuffers_.at(renderPass)[swapImageIndex_ % numFramebuffers];
 }
 
-VkBuffer RenderDevice::createVertexBuffer(const void *data, VkDeviceSize size) {
-    if (size <= 0) {
-        Log::fatal("Invalid vertex buffer size: %", size);
+VkBuffer RenderDevice::createBufferGPU(const void *data, VkDeviceSize size, u32 buffer_usage) {
+    // Create our buffer and memory
+    VkBufferCreateInfo bufferCI = {};
+    bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCI.size = size;
+    bufferCI.usage = buffer_usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocCI = {};
+    allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo allocInfo;
+    VK_CHECKF(vmaCreateBuffer(allocator_, &bufferCI, &allocCI, &buffer, &allocation, &allocInfo));
+    cleanupStack_.emplace([ = ]() {
+        vmaDestroyBuffer(allocator_, buffer, allocation);
+    });
+
+    VkMemoryPropertyFlags memFlags;
+    vmaGetMemoryTypeProperties(allocator_, allocInfo.memoryType, &memFlags);
+    if ((memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) {
+        // If the memory happens to be mappable, no need for staging buffer
+        void *mappedData;
+        vmaMapMemory(allocator_, allocation, &mappedData);
+        std::memcpy(mappedData, data, (size_t) size);
+        vmaUnmapMemory(allocator_, allocation);
+    } else {
+        // Otherwise, we need a staging buffer
+        std::pair<VkBuffer, VmaAllocation> stagingBuffer = createStagingBufferCPU(data, size);
+
+        // Copy staging buffer into vertex buffer
+        submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
+            cmd.copyBuffer(buffer, stagingBuffer.first, size);
+        });
+
+        // Destroy staging buffer
+        vmaDestroyBuffer(allocator_, stagingBuffer.first, stagingBuffer.second);
     }
 
-    return createBufferGPU(data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-}
-
-VkBuffer RenderDevice::createIndexBuffer(const void *data, VkDeviceSize size) {
-    if (size <= 0) {
-        Log::fatal("Invalid index buffer size: %", size);
-    }
-
-    return createBufferGPU(data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    return buffer;
 }
 
 std::pair<VkImage, VkImageView> RenderDevice::createTextureGPUFromData(VkImageCreateInfo image_ci,
@@ -1194,49 +1221,6 @@ void RenderDevice::createSwapchain() {
     }
 }
 
-VkBuffer RenderDevice::createBufferGPU(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage) {
-    // Create our buffer and memory
-    VkBufferCreateInfo bufferCI = {};
-    bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferCI.size = size;
-    bufferCI.usage = usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VmaAllocationCreateInfo allocCI = {};
-    allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-    VkBuffer buffer;
-    VmaAllocation allocation;
-    VmaAllocationInfo allocInfo;
-    VK_CHECKF(vmaCreateBuffer(allocator_, &bufferCI, &allocCI, &buffer, &allocation, &allocInfo));
-    cleanupStack_.emplace([ = ]() {
-        vmaDestroyBuffer(allocator_, buffer, allocation);
-    });
-
-    VkMemoryPropertyFlags memFlags;
-    vmaGetMemoryTypeProperties(allocator_, allocInfo.memoryType, &memFlags);
-    if ((memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) {
-        // If the memory happens to be mappable, no need for staging buffer
-        void *mappedData;
-        vmaMapMemory(allocator_, allocation, &mappedData);
-        std::memcpy(mappedData, data, (size_t) size);
-        vmaUnmapMemory(allocator_, allocation);
-    } else {
-        // Otherwise, we need a staging buffer
-        std::pair<VkBuffer, VmaAllocation> stagingBuffer = createStagingBufferCPU(data, size);
-
-        // Copy staging buffer into vertex buffer
-        submitOneTimeCommands(graphicsQueue_, [ = ](CommandBuffer cmd) {
-            cmd.copyBuffer(buffer, stagingBuffer.first, size);
-        });
-
-        // Destroy staging buffer
-        vmaDestroyBuffer(allocator_, stagingBuffer.first, stagingBuffer.second);
-    }
-
-    return buffer;
-}
-
 std::pair<VkBuffer, VmaAllocation> RenderDevice::createStagingBufferCPU(const void *data, VkDeviceSize size) {
     VkBufferCreateInfo stagingBufferCI = {};
     stagingBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1290,6 +1274,9 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(VkDescriptorSetLayout set_layou
 
     std::vector<VkWriteDescriptorSet> writes;
 
+    // TODO: somehow prevent re-allocation/throw an error on grow for the info vectors?
+    // or just make your own vector/list
+
     //----------------------------------
     // Input attachments
     //----------------------------------
@@ -1321,7 +1308,7 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(VkDescriptorSetLayout set_layou
     //----------------------------------
 
     std::vector<VkDescriptorBufferInfo> bufferInfos;
-    bufferInfos.reserve(set.getUniformBufferInfos().size());
+    bufferInfos.reserve(set.getUniformBufferInfos().size() + set.getStorageBufferInfos().size());
 
     const u8 *srcPtr = set.getUniformBufferData().data();
     u8 *dstPtr = reinterpret_cast<u8 *>(uniformBufferMappedPointers_.at(swapImageIndex_));
@@ -1404,6 +1391,29 @@ VkDescriptorSet RenderDevice::getVkDescriptorSet(VkDescriptorSetLayout set_layou
         write.descriptorCount = 1;
         write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         write.pImageInfo = &imageInfos.back();
+
+        writes.emplace_back(write);
+    }
+
+    //----------------------------------
+    // Storage buffer
+    //----------------------------------
+
+    for (const StorageBufferDescriptorInfo &info : set.getStorageBufferInfos()) {
+        // Set buffer info
+        VkDescriptorBufferInfo bufferInfo = {};
+        bufferInfo.buffer = info.buffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = info.dataRange;
+        bufferInfos.emplace_back(bufferInfo);
+
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = dstSet;
+        write.dstBinding = info.binding;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        write.pBufferInfo = &bufferInfos.back();
 
         writes.emplace_back(write);
     }

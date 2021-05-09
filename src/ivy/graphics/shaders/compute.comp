@@ -1,12 +1,47 @@
 #version 450
+
+// TODO: put this somewhere else
+struct VertexP3N3T3B3UV2 {
+    vec3 position;
+    vec3 normal;
+    vec3 tangent;
+    vec3 bitangent;
+    vec2 uv;
+};
+
 layout (local_size_x = 1, local_size_y = 1) in;
 
 layout (binding = 0, rgba8) uniform writeonly image2D uImage;
+
+layout (set = 0, binding = 1) uniform PerFrame {
+    mat4 invProjection;
+    mat4 invView;
+    uint numIndices;
+} uFrame;
+
+layout (std140, set = 0, binding = 2) readonly buffer VertexBuffer {
+    VertexP3N3T3B3UV2 vertices[];
+} uVertices;
+
+layout (std430, set = 0, binding = 3) readonly buffer IndexBuffer {
+    uint indices[];
+} uIndices;
+
+#include "bvh.glsl" // HitInfo, intersect
 
 void main() {
     ivec2 resolution = imageSize(uImage);
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / resolution;
     vec3 color = vec3(uv, 1.0);
+
+    // ndc -> world space
+    vec4 ndc = vec4(uv * 2 - 1, 1, 1);
+    vec4 rayEnd = uFrame.invView * uFrame.invProjection * ndc;
+    vec3 rayOrigin = uFrame.invView[3].xyz;
+    vec3 rayDir = normalize(rayEnd.xyz / rayEnd.w - rayOrigin);
+
+    HitInfo hit = intersect(rayOrigin, rayDir);
+    color = hit.normal * 0.5 + 0.5;
 
     imageStore(uImage, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 }

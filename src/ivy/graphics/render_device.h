@@ -129,20 +129,13 @@ public:
     Framebuffer &getFramebuffer(const GraphicsPass &pass);
 
     /**
-     * \brief Create a vertex buffer with the lifetime of the render device
-     * \param data Pointer to vertex data
-     * \param size Size of vertex data in bytes
+     * \brief Create a buffer on the GPU with the lifetime of the render device
+     * \param data Pointer to the data
+     * \param size Size of the buffer in bytes
+     * \param buffer_usage How the buffer will be used, VkBufferUsageFlagBits
      * \return VkBuffer
      */
-    VkBuffer createVertexBuffer(const void *data, VkDeviceSize size);
-
-    /**
-     * \brief Create an index buffer (of u32s) with the lifetime of the render device
-     * \param data Pointer to index data
-     * \param size Size of index buffer in bytes
-     * \return VkBuffer
-     */
-    VkBuffer createIndexBuffer(const void *data, VkDeviceSize size);
+    VkBuffer createBufferGPU(const void *data, VkDeviceSize size, u32 buffer_usage);
 
     /**
      * \brief Create an image on the GPU using given image data with the lifetime of the render device
@@ -206,15 +199,6 @@ private:
      * \brief Create the swapchain and images for swapchain
      */
     void createSwapchain();
-
-    /**
-     * \brief Create a buffer on the GPU with the lifetime of the render device
-     * \param data Pointer to the data
-     * \param size Size of the buffer in bytes
-     * \param usage How the buffer will be used
-     * \return VkBuffer
-     */
-    VkBuffer createBufferGPU(const void *data, VkDeviceSize size, VkBufferUsageFlagBits usage);
 
     /**
      * \brief Create a staging src buffer on the CPU, you need to destroy this yourself with vmaDestroyBuffer

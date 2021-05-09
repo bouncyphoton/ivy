@@ -35,15 +35,13 @@ TestGame::TestGame()
 void TestGame::init() {
     ResourceManager &resourceManager = engine_.getResourceManager();
 
-    // Add helmets
-    for (i32 i = 0; i < 10; ++i) {
-        EntityHandle helmet = scene_.createEntity();
-        helmet->setComponent(Transform(glm::vec3((i - 5) * 2, 1, 0), glm::vec3(0), glm::vec3(2)));
-        helmet->setTag("helmet");
-        helmet->setComponent(Model(
-                                 resourceManager.getModel("models/glTF-Sample-Models/2.0/FlightHelmet/glTF/FlightHelmet.gltf")));
+    // Add cornell box
+    {
+        EntityHandle box = scene_.createEntity();
+        box->setComponent<Transform>();
+        box->setComponent(Model(resourceManager.getModel("models/CornellBox/CornellBox-Original.obj")));
+        box->setTag("cornell_box");
     }
-
     // Add lights
     for (i32 i = 0; i < 2; ++i) {
         f32 x = (i - 1) * 5.0f;
@@ -61,6 +59,16 @@ void TestGame::init() {
         light->setComponent(PointLight(colors[i], 400));
         light->setTag("pnt_light");
     }
+    /*
+    // Add helmets
+    for (i32 i = 0; i < 10; ++i) {
+        EntityHandle helmet = scene_.createEntity();
+        helmet->setComponent(Transform(glm::vec3((i - 5) * 2, 1, 0), glm::vec3(0), glm::vec3(2)));
+        helmet->setTag("helmet");
+        helmet->setComponent(Model(
+                                 resourceManager.getModel("models/glTF-Sample-Models/2.0/FlightHelmet/glTF/FlightHelmet.gltf")));
+    }
+
 
     // Add sponza
     {
@@ -69,12 +77,13 @@ void TestGame::init() {
         sponza->setComponent<Transform>();
         sponza->setComponent(Model(resourceManager.getModel("models/sponza/sponza.obj")));
     }
+    */
 
     // Add camera
     {
         EntityHandle camera = scene_.createEntity();
         camera->setTag("camera");
-        camera->setComponent(Transform(glm::vec3(0.25, 2, -1), glm::vec3(6.2, 2.5, 0)));
+        camera->setComponent(Transform(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0)));
         camera->setComponent<Camera>();
     }
 }
@@ -193,8 +202,11 @@ void TestGame::update() {
 }
 
 void TestGame::render() {
-    // rendererRaster_.render(scene_, debugMode_);
-    rendererRT_.render(scene_);
+    if ((u32)glfwGetTime() % 2 == 0) {
+        rendererRaster_.render(scene_, debugMode_);
+    } else {
+        rendererRT_.render(scene_);
+    }
 }
 
 Options TestGame::getOptions() {

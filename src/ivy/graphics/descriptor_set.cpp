@@ -49,6 +49,10 @@ void DescriptorSet::setStorageImage(u32 binding, VkImageView view) {
     storageImageSamplerInfos_.emplace_back(binding, view);
 }
 
+void DescriptorSet::setStorageBuffer(u32 binding, VkBuffer buffer, VkDeviceSize size) {
+    storageBufferInfos_.emplace_back(binding, buffer, size);
+}
+
 void DescriptorSet::validate() const {
     std::string errorMessage;
     std::set<u32> seenBindings;
@@ -97,6 +101,11 @@ void DescriptorSet::validate() const {
     // Check storage images
     for (const StorageImageSamplerDescriptorInfo &info : storageImageSamplerInfos_) {
         validateBinding(info.binding, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    }
+
+    // Check storage buffer
+    for (const StorageBufferDescriptorInfo &info : storageBufferInfos_) {
+        validateBinding(info.binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     }
 
     // TODO: check other bindings when they get implemented

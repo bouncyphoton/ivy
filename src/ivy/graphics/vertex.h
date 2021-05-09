@@ -155,11 +155,12 @@ public:
         return attributes;
     }
 
-    glm::vec3 position;
-    glm::vec3 normal;
-    glm::vec3 tangent;
-    glm::vec3 bitangent;
-    glm::vec2 uv;
+    // TODO: we do this for ray tracing alignment, we don't want this though
+    alignas(16) glm::vec3 position;
+    alignas(16) glm::vec3 normal;
+    alignas(16) glm::vec3 tangent;
+    alignas(16) glm::vec3 bitangent;
+    alignas(8) glm::vec2 uv;
 };
 
 }

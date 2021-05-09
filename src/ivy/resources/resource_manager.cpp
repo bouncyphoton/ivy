@@ -130,22 +130,31 @@ bool ResourceManager::loadModelFromFile(const std::string &model_path) {
                               mesh->mNormals[v].z
                           );
 
-            vert.tangent = glm::vec3(
-                               mesh->mTangents[v].x,
-                               mesh->mTangents[v].y,
-                               mesh->mTangents[v].z
-                           );
+            // If there's no UV, tangent and bi-tangent can't be generated
+            // TODO: figure out solution or don't
 
-            vert.bitangent = glm::vec3(
-                                 mesh->mBitangents[v].x,
-                                 mesh->mBitangents[v].y,
-                                 mesh->mBitangents[v].z
-                             );
+            if (mesh->mTangents) {
+                vert.tangent = glm::vec3(
+                                   mesh->mTangents[v].x,
+                                   mesh->mTangents[v].y,
+                                   mesh->mTangents[v].z
+                               );
+            }
 
-            vert.uv = glm::vec2(
-                          mesh->mTextureCoords[0][v].x,
-                          mesh->mTextureCoords[0][v].y
-                      );
+            if (mesh->mBitangents) {
+                vert.bitangent = glm::vec3(
+                                     mesh->mBitangents[v].x,
+                                     mesh->mBitangents[v].y,
+                                     mesh->mBitangents[v].z
+                                 );
+            }
+
+            if (mesh->mTextureCoords[0]) {
+                vert.uv = glm::vec2(
+                              mesh->mTextureCoords[0][v].x,
+                              mesh->mTextureCoords[0][v].y
+                          );
+            }
         }
 
         // Process indices

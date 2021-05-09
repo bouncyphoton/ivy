@@ -13,8 +13,18 @@ ComputePassBuilder &ComputePassBuilder::setShader(const std::string &shader_path
     return *this;
 }
 
+ComputePassBuilder &ComputePassBuilder::addUniformBufferDescriptor(u32 set, u32 binding) {
+    addDescriptor(set, binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    return *this;
+}
+
 ComputePassBuilder &ComputePassBuilder::addStorageImageDescriptor(u32 set, u32 binding) {
     addDescriptor(set, binding, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    return *this;
+}
+
+ComputePassBuilder &ComputePassBuilder::addStorageBufferDescriptor(u32 set, u32 binding) {
+    addDescriptor(set, binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     return *this;
 }
 

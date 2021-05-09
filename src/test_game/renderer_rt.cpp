@@ -1,6 +1,17 @@
 #include "renderer_rt.h"
+#include "ivy/log.h"
+#include "ivy/scene/components/camera.h"
+#include "ivy/scene/components/transform.h"
+#include "ivy/scene/components/model.h"
+#include <glm/glm.hpp>
 
 using namespace ivy;
+
+struct PerFrameRT {
+    alignas(16) glm::mat4 invProjection;
+    alignas(16) glm::mat4 invView;
+    alignas(4) u32 numIndices;
+};
 
 RendererRT::RendererRT(gfx::RenderDevice &render_device)
     : device_(render_device) {
@@ -18,8 +29,9 @@ RendererRT::RendererRT(gfx::RenderDevice &render_device)
     rtPass_ = gfx::ComputePassBuilder(device_)
               .setShader("../assets/shaders/compute.comp.spv")
               .addStorageImageDescriptor(0, 0)
-              // TODO: descriptor sets
-              // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+              .addUniformBufferDescriptor(0, 1)
+              .addStorageBufferDescriptor(0, 2) // Vertices
+              .addStorageBufferDescriptor(0, 3) // Indices
               .build();
 
     presentPass_ = gfx::GraphicsPassBuilder(device_)
@@ -34,8 +46,6 @@ RendererRT::RendererRT(gfx::RenderDevice &render_device)
 }
 
 void RendererRT::render(Scene &scene) {
-    (void)scene;
-
     device_.beginFrame();
     gfx::CommandBuffer cmd = device_.getCommandBuffer();
 
@@ -54,8 +64,38 @@ void RendererRT::render(Scene &scene) {
 
     // Ray trace compute shader
     cmd.executeComputePass(*rtPass_, [&]() {
+        EntityHandle cameraEntity = scene.findEntityWithAllComponents<Camera, Transform>();
+        if (!cameraEntity) {
+            Log::warn("No camera found in scene");
+            return;
+        }
+
+        Camera    camera          = *cameraEntity->getComponent<Camera>();
+        Transform cameraTransform = *cameraEntity->getComponent<Transform>();
+        f32 aspectRatio = texture_->getExtent().width / (f32) texture_->getExtent().height;
+
+        glm::mat4 proj = glm::perspective(camera.getFovY(), aspectRatio, camera.getNearPlane(), camera.getFarPlane());
+        glm::mat4 view = glm::lookAt(cameraTransform.getPosition(),
+                                     cameraTransform.getPosition() + cameraTransform.getForward(), Transform::UP);
+
+        const auto &meshes = scene.findEntitiesWithTag("cornell_box").front()->getComponent<Model>()->getMeshes();
+
+        // TODO: have all the vertices in one buffer, all the indices in one buffer, etc.
+        // currently, we just cycle through the meshes and render one per frame (epilepsy warning)
+        static u32 c = 0;
+        const gfx::Geometry &mesh = meshes.at(c).getGeometry();
+        c = (c + 1) % meshes.size();
+
+        PerFrameRT perFrame = {};
+        perFrame.invProjection = glm::inverse(proj);
+        perFrame.invView = glm::inverse(view);
+        perFrame.numIndices = mesh.getNumIndices();
+
         gfx::DescriptorSet set(*rtPass_, 0);
         set.setStorageImage(0, *texture_);
+        set.setUniformBuffer(1, perFrame);
+        set.setStorageBuffer(2, mesh.getVertexBuffer(), mesh.getVertexBufferSize());
+        set.setStorageBuffer(3, mesh.getIndexBuffer(), mesh.getIndexBufferSize());
         cmd.setDescriptorSet(device_, *rtPass_, set);
 
         cmd.dispatch(texture_->getExtent().width, texture_->getExtent().height);

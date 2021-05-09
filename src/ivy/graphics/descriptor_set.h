@@ -47,6 +47,15 @@ struct StorageImageSamplerDescriptorInfo {
     VkImageView view;
 };
 
+struct StorageBufferDescriptorInfo {
+    StorageBufferDescriptorInfo(u32 binding, VkBuffer buffer, VkDeviceSize size)
+        : binding(binding), buffer(buffer), dataRange(size) {}
+
+    u32 binding;
+    VkBuffer buffer;
+    VkDeviceSize dataRange;
+};
+
 // TODO: allow already set parts of descriptor set to be updated
 // TODO: array descriptors
 
@@ -116,6 +125,14 @@ public:
     void setStorageImage(u32 binding, VkImageView view);
 
     /**
+     * \brief Set a storage buffer in the descriptor set
+     * \param binding The binding in the set for the storage buffer
+     * \param buffer The buffer
+     * \param size The size of the buffer
+     */
+    void setStorageBuffer(u32 binding, VkBuffer buffer, VkDeviceSize size);
+
+    /**
      * \brief Validate that everything was set properly
      */
     void validate() const;
@@ -169,6 +186,14 @@ public:
     }
 
     /**
+     * \brief Get the storage buffer infos for this descriptor set
+     * \return Vector of StorageBufferDescriptorInfo
+     */
+    [[nodiscard]] const std::vector<StorageBufferDescriptorInfo> &getStorageBufferInfos() const {
+        return storageBufferInfos_;
+    }
+
+    /**
      * \brief Get the uniform buffer data
      * \return A vector of bytes with uniform buffer data
      */
@@ -185,6 +210,7 @@ private:
     std::vector<UniformBufferDescriptorInfo> uniformBufferInfos_;
     std::vector<CombinedImageSamplerDescriptorInfo> combinedImageSamplerInfos_;
     std::vector<StorageImageSamplerDescriptorInfo> storageImageSamplerInfos_;
+    std::vector<StorageBufferDescriptorInfo> storageBufferInfos_;
     std::vector<u8> uniformBufferData_;
 };
 

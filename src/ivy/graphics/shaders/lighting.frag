@@ -59,6 +59,10 @@ void main() {
     switch (uFrame.debugMode) {
         case DEBUG_FULL:
             color = brdf(diffuse, occlusion, roughness, metallic, normal, -viewDir, lightDirection) * getIlluminance(uLight.light, normal, worldPos);
+
+            // Tonemap and gamma correct
+            color = ACESFilm(color);
+            color = linearToSrgb(color);
             break;
         case DEBUG_DIFFUSE:
             color = diffuse;
@@ -73,10 +77,6 @@ void main() {
             color = texture(uShadowMapPoint, vec4(lightDirection, uLight.light.shadowIndex)).rrr;
             break;
     }
-
-    // Tonemap and gamma correct
-    color = ACESFilm(color);
-    color = linearToSrgb(color);
 
     oFragColor = vec4(color, 1);
 }
