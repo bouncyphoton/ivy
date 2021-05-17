@@ -69,9 +69,9 @@ HitInfo intersect(vec3 ray_origin, vec3 ray_direction) {
     bool intersected = false;
 
     for (uint i = 0; i < uFrame.numIndices; i += 3) {
-        VertexP3N3T3B3UV2 v0 = uVertices.vertices[uIndices.indices[i + 0]];
-        VertexP3N3T3B3UV2 v1 = uVertices.vertices[uIndices.indices[i + 1]];
-        VertexP3N3T3B3UV2 v2 = uVertices.vertices[uIndices.indices[i + 2]];
+        VertexP3N3T3B3UV2 v0 = getVertex(uIndices.indices[i + 0]);
+        VertexP3N3T3B3UV2 v1 = getVertex(uIndices.indices[i + 1]);
+        VertexP3N3T3B3UV2 v2 = getVertex(uIndices.indices[i + 2]);
 
         HitInfo latest = intersectTriangle(ray_origin, ray_direction, v0, v1, v2);
         if (latest.t != -1 && (latest.t < hit.t || !intersected)) {

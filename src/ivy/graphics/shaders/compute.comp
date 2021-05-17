@@ -1,6 +1,7 @@
 #version 450
 
 // TODO: put this somewhere else
+const int VertexStrideFloats = 14;
 struct VertexP3N3T3B3UV2 {
     vec3 position;
     vec3 normal;
@@ -19,13 +20,24 @@ layout (set = 0, binding = 1) uniform PerFrame {
     uint numIndices;
 } uFrame;
 
-layout (std140, set = 0, binding = 2) readonly buffer VertexBuffer {
-    VertexP3N3T3B3UV2 vertices[];
+layout (std430, set = 0, binding = 2) readonly buffer VertexBuffer {
+    float data[];
 } uVertices;
 
 layout (std430, set = 0, binding = 3) readonly buffer IndexBuffer {
     uint indices[];
 } uIndices;
+
+VertexP3N3T3B3UV2 getVertex(uint index) {
+    uint offset = index * VertexStrideFloats;
+    VertexP3N3T3B3UV2 v;
+    v.position  = vec3(uVertices.data[offset + 0], uVertices.data[offset + 1], uVertices.data[offset + 2]);
+    v.normal    = vec3(uVertices.data[offset + 3], uVertices.data[offset + 4], uVertices.data[offset + 5]);
+    v.tangent   = vec3(uVertices.data[offset + 6], uVertices.data[offset + 7], uVertices.data[offset + 8]);
+    v.bitangent = vec3(uVertices.data[offset + 9], uVertices.data[offset + 10], uVertices.data[offset + 11]);
+    v.uv        = vec2(uVertices.data[offset + 12], uVertices.data[offset + 13]);
+    return v;
+}
 
 #include "bvh.glsl" // HitInfo, intersect
 
