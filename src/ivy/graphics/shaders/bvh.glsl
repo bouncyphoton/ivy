@@ -6,8 +6,9 @@
 // This assumes the following is accessible
 // VertexP3N3T3B3UV2
 // uFrame.numIndices  -> number of indices
-// uVertices.vertices -> variable length array of vertices
+// uVertices.data     -> variable length array of floats
 // uIndices.indices   -> variable length array of indices (of length numIndices)
+// VertexP3N3T3B3UV2 getVertex(uint index); -> get a vertex from an index
 
 struct HitInfo {
     float t;
