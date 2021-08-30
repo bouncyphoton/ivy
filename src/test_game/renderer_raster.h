@@ -9,6 +9,8 @@
 #include "ivy/graphics/texture.h"
 #include "ivy/scene/scene.h"
 
+#include "ivy/resources/texture_resource.h"
+
 /**
  * \brief High level rasterized renderer
  */
@@ -21,7 +23,7 @@ public:
         FULL, DIFFUSE, NORMAL, OCCLUSION_ROUGHNESS_METALLIC, SHADOW_MAP
     };
 
-    explicit RendererRaster(ivy::gfx::RenderDevice &render_device);
+    explicit RendererRaster(ivy::gfx::RenderDevice &render_device, ivy::Engine &engine);
     ~RendererRaster();
 
     /**
@@ -48,6 +50,8 @@ private:
     const ivy::u32 maxShadowCastingPointLights_ = 2;
     ivy::u32 numShadowsPoint_ = 0;
     std::optional<ivy::gfx::Texture> pointLightShadowAtlas_;
+
+    const ivy::gfx::Texture *blueNoiseTex_;
 };
 
 #endif // IVY_RENDERER_RASTER_H

@@ -1,5 +1,6 @@
 #include "renderer_raster.h"
 #include "ivy/log.h"
+#include "ivy/engine.h"
 #include "ivy/graphics/vertex.h"
 #include "ivy/scene/components/transform.h"
 #include "ivy/scene/components/model.h"
@@ -49,7 +50,7 @@ struct PerLightLightingPass {
     alignas(4) u32 shadowIndex;
 };
 
-RendererRaster::RendererRaster(gfx::RenderDevice &render_device)
+RendererRaster::RendererRaster(gfx::RenderDevice &render_device, ivy::Engine &engine)
     : device_(render_device) {
     LOG_CHECKPOINT();
 
@@ -80,6 +81,9 @@ RendererRaster::RendererRaster(gfx::RenderDevice &render_device)
                              .setAdditionalUsage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                              .setArrayLength(maxShadowCastingPointLights_)
                              .build();
+
+    // Load blue noise texture
+    blueNoiseTex_ = &engine.getResourceManager().getTexture("HDR_L_0.png").get();
 
     // Directional light shadow map pass
     passes_.emplace_back(
@@ -159,6 +163,7 @@ RendererRaster::RendererRaster(gfx::RenderDevice &render_device)
                     .addUniformBufferDescriptor(1, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addTextureDescriptor(1, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addTextureDescriptor(1, 2, VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .addTextureDescriptor(1, 3, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .addUniformBufferDescriptor(2, 0, VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build()
                    )
@@ -473,6 +478,7 @@ void RendererRaster::render(Scene &scene, DebugMode debug_mode) {
                 perFrameSet.setUniformBuffer(0, perFrame);
                 perFrameSet.setTexture(1, *directionalLightShadowAtlas_, nearestSampler_);
                 perFrameSet.setTexture(2, *pointLightShadowAtlas_, nearestSampler_);
+                perFrameSet.setTexture(3, *blueNoiseTex_, nearestSampler_);
                 cmd.setDescriptorSet(device_, lightingPass, perFrameSet);
             }
 

@@ -14,7 +14,7 @@
 using namespace ivy;
 
 TestGame::TestGame()
-    : engine_(getOptions()), rendererRaster_(engine_.getRenderDevice()), rendererRT_(engine_.getRenderDevice()) {
+    : engine_(getOptions()), rendererRaster_(engine_.getRenderDevice(), engine_), rendererRT_(engine_.getRenderDevice()) {
 
     // Set logging level
     Log::logLevel = Log::LogLevel::DEBUG;
@@ -59,7 +59,7 @@ void TestGame::init() {
         light->setComponent(PointLight(colors[i], 400));
         light->setTag("pnt_light");
     }
-    /*
+
     // Add helmets
     for (i32 i = 0; i < 10; ++i) {
         EntityHandle helmet = scene_.createEntity();
@@ -69,7 +69,6 @@ void TestGame::init() {
                                  resourceManager.getModel("models/glTF-Sample-Models/2.0/FlightHelmet/glTF/FlightHelmet.gltf")));
     }
 
-
     // Add sponza
     {
         EntityHandle sponza = scene_.createEntity();
@@ -77,7 +76,6 @@ void TestGame::init() {
         sponza->setComponent<Transform>();
         sponza->setComponent(Model(resourceManager.getModel("models/sponza/sponza.obj")));
     }
-    */
 
     // Add camera
     {
@@ -202,11 +200,11 @@ void TestGame::update() {
 }
 
 void TestGame::render() {
-    if ((u32)glfwGetTime() % 2 == 0) {
+//    if ((u32)glfwGetTime() % 2 == 0) {
         rendererRaster_.render(scene_, debugMode_);
-    } else {
-        rendererRT_.render(scene_);
-    }
+//    } else {
+//        rendererRT_.render(scene_);
+//    }
 }
 
 Options TestGame::getOptions() {

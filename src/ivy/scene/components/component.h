@@ -10,6 +10,8 @@ namespace ivy {
  */
 class Component {
 public:
+    virtual ~Component() = default;
+
     [[nodiscard]] virtual std::string getName() const = 0;
 };
 
